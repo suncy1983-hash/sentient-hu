@@ -1,5 +1,5 @@
-ARG BUILD_FROM
-FROM ${BUILD_FROM}
+# Debian, not Home Assistant's Alpine base: the speech model's library ships for glibc.
+FROM docker.io/library/python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 VOICE_ID_DATA=/data VOICE_ID_MODEL=/models/wespeaker.onnx
 
