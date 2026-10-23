@@ -35,6 +35,7 @@ from .const import (
 
 from . import i18n
 from .i18n import t
+from .voice import VoiceIDError
 
 if TYPE_CHECKING:
     from . import SentientRuntime
@@ -352,6 +353,64 @@ class CalendarEventTool(_Tool):
             "end": data.get("end_date_time") or data["end_date"],
             "all_day": all_day,
         }
+
+
+class LearnVoiceTool(_Tool):
+    name = "sentient_learn_voice"
+    description = (
+        "Learn someone's voice, so the house knows who is talking from then on. If the person talking is the one "
+        "to learn ('learn my voice, I'm Sanya'), set this_is_them true. If they ask you to learn someone else's "
+        "voice ('learn Lili's voice'), set it false and ask that person to talk to you next. Either way the next "
+        "few sentences heard are taken as that person's voice, so tell them to chat for a few turns."
+    )
+    parameters = vol.Schema({vol.Required("name"): cv.string, vol.Optional("this_is_them", default=True): cv.boolean})
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        try:
+            return await rt.voice.async_learn(tool_input.tool_args["name"], tool_input.tool_args.get("this_is_them", True))
+        except VoiceIDError as err:
+            return {"error": str(err)}
+
+
+class VoicesTool(_Tool):
+    annotations = _read_only()
+    name = "sentient_voices"
+    description = "Whose voices the house knows, and who it thinks is talking right now."
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        heard = rt.voice.current()
+        try:
+            people = await rt.voice.async_people()
+        except VoiceIDError as err:
+            return {"error": str(err)}
+        return {"voices": people, "talking_now": (heard.name if heard and (heard.known or heard.enrolling) else None)}
+
+
+class ForgetVoiceTool(_Tool):
+    name = "sentient_forget_voice"
+    description = "Forget someone's voice completely (they can be learned again later)."
+    parameters = vol.Schema({vol.Required("name"): cv.string})
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        try:
+            return await rt.voice.async_forget(tool_input.tool_args["name"])
+        except VoiceIDError as err:
+            return {"error": str(err)}
 
 
 class ListWatchesTool(_Tool):
@@ -840,8 +899,43 @@ class SentientAPI(llm.API):
             llm_context=llm_context,
             tools=[RememberTool(), RecallTool(), ForgetTool(), AnnounceTool(),
                    WatchTool(), RemindTool(), ListWatchesTool(), CancelWatchTool(), LookTool(),
-                   RoutinesTool(), AdoptRoutineTool(), ForgetRoutineTool(), HeatingTool(), NightWatchTool(), WeeklyTool(), BriefingTool(), VisitorsTool(), SpotTool(), MotionLightsTool(), TimelineTool(), QuietTool(), ShushTool(), RunRoutineTool(), EnergyTool(), SecurityTool(), ScenesTool(), CalendarEventTool()],
+                   RoutinesTool(), AdoptRoutineTool(), ForgetRoutineTool(), HeatingTool(), NightWatchTool(), WeeklyTool(), BriefingTool(), VisitorsTool(), SpotTool(), MotionLightsTool(), TimelineTool(), QuietTool(), ShushTool(), RunRoutineTool(), EnergyTool(), SecurityTool(), ScenesTool(), CalendarEventTool()]
+                  + ([LearnVoiceTool(), VoicesTool(), ForgetVoiceTool()] if self._voice_on() else []),
         )
+
+    def _voice_on(self) -> bool:
+        rt = _runtime(self.hass)
+        return bool(rt and rt.voice.enabled)
+
+    @staticmethod
+    def _speaker_lines(rt: SentientRuntime) -> list[str]:
+        """Who is talking, from their voice (only when voice recognition is set up)."""
+        voice = rt.voice
+        if not voice.enabled:
+            return []
+        heard = voice.current()
+        enrol = voice.enrolling()
+        if heard and heard.enrolling and enrol:
+            out = [f"You are learning {heard.name}'s voice: {enrol['left']} more sentence(s) needed. Just chat "
+                   f"with {heard.name} in short, friendly turns."]
+        elif heard and heard.enrolling:
+            out = [f"You have just finished learning {heard.name}'s voice: tell them you'll know it's them now."]
+        elif heard and heard.known and heard.name:
+            out = [f"The person talking to you is {heard.name} (recognised by their voice). Talk to them as "
+                   f"{heard.name}; use sentient_recall with their name for what you know about them (age, likes, "
+                   "stories you're telling them)."]
+        elif heard and heard.unsure and heard.name:
+            out = [f"The person talking might be {heard.name}, but the voice wasn't clear enough to be sure: "
+                   "don't share or act on anything personal on that guess."]
+        else:
+            out = ["You couldn't tell from the voice who is talking."]
+        out.append(
+            "When you tell someone a story, or play a game they'll want to carry on later, save where it got to with "
+            "sentient_remember (category note), saying who it's for, e.g. \"Lili's dragon story: the dragon found "
+            "the lost key, next she flies home\". To carry on, recall it by their name. To learn a voice, use "
+            "sentient_learn_voice."
+        )
+        return out
 
     def _prompt(self, llm_context: llm.LLMContext) -> str:
         rt = _runtime(self.hass)
@@ -859,6 +953,7 @@ class SentientAPI(llm.API):
         room = self._room_of_device(llm_context.device_id)
         if room:
             lines.append(f"The person talking to you is in the {room}.")
+        lines.extend(self._speaker_lines(rt))
         if rt.speech.guest_mode:
             lines.append(
                 "Guests are visiting: don't bring up personal household details, routines or memories "

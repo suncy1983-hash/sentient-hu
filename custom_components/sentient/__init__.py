@@ -60,10 +60,11 @@ from .heating import Heating
 from .nightwatch import NightWatch
 from .watches import WatchManager
 from .speech import SpeechRouter
+from .voice import VoiceID
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.STT]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -94,6 +95,7 @@ class SentientRuntime:
     feedback: Feedback
     heating: Heating
     night_watch: NightWatch
+    voice: VoiceID
 
 
 type SentientConfigEntry = ConfigEntry[SentientRuntime]
@@ -252,7 +254,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
         options=options, memory=memory, speech=speech, tracker=tracker, watches=watches,
         noticer=noticer, learner=learner, upkeep=upkeep, visitors=visitors, spots=spots, health=health,
         motion_lights=motion_lights, timeline=timeline, notifier=notifier, welcome=welcome, mutes=mutes, critical=critical, shortcuts=shortcuts, left_open=left_open,
-        feedback=feedback, heating=heating, night_watch=night_watch,
+        feedback=feedback, heating=heating, night_watch=night_watch, voice=VoiceID(hass, options),
     )
     night_watch.async_start()
     entry.async_on_unload(night_watch.async_stop)
@@ -303,6 +305,7 @@ async def _async_options_updated(hass: HomeAssistant, entry: SentientConfigEntry
     entry.runtime_data.health.options = options
     entry.runtime_data.notifier.options = options
     entry.runtime_data.welcome.options = options
+    entry.runtime_data.voice.options = options
     entry.runtime_data.critical.options = options
     entry.runtime_data.left_open.options = options
     entry.runtime_data.heating.options = options

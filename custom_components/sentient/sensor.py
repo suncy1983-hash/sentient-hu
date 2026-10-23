@@ -16,7 +16,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
 from . import SentientConfigEntry
-from .const import DOMAIN, EVENT_HELD, EVENT_MEMORY_CHANGED, EVENT_HEALTH_CHANGED, EVENT_NOTICED, EVENT_ROUTINES_CHANGED, EVENT_SPOKE, EVENT_VISITOR, EVENT_WATCH_CHANGED
+from .const import DOMAIN, EVENT_HELD, EVENT_MEMORY_CHANGED, EVENT_HEALTH_CHANGED, EVENT_NOTICED, EVENT_ROUTINES_CHANGED, EVENT_SPEAKER, EVENT_SPOKE, EVENT_VISITOR, EVENT_WATCH_CHANGED
 
 
 async def async_setup_entry(
@@ -24,7 +24,43 @@ async def async_setup_entry(
     entry: SentientConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    async_add_entities([MemorySensor(entry), LastSpokenSensor(entry), LikelyRoomSensor(entry), WatchesSensor(entry), RoutinesSensor(entry), VisitorsSensor(entry), HealthSensor(entry)])
+    async_add_entities([MemorySensor(entry), LastSpokenSensor(entry), LikelyRoomSensor(entry), WatchesSensor(entry), RoutinesSensor(entry), VisitorsSensor(entry), HealthSensor(entry), SpeakerSensor(entry)])
+
+
+class SpeakerSensor(SensorEntity):
+    """Who spoke last, from their voice: a name, 'unknown', or nothing yet."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_icon = "mdi:account-voice"
+    _attr_translation_key = "speaker"
+
+    def __init__(self, entry: SentientConfigEntry) -> None:
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_speaker"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(self.hass.bus.async_listen(EVENT_SPEAKER, self._heard))
+
+    @callback
+    def _heard(self, _event: Event) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> str | None:
+        heard = self._entry.runtime_data.voice.last
+        if heard is None:
+            return None
+        return heard.name if (heard.known or heard.enrolling) and heard.name else "unknown"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        heard = self._entry.runtime_data.voice.last
+        if heard is None:
+            return {}
+        return {"maybe": heard.name if heard.unsure else None, "score": heard.score, "at": heard.at.isoformat(),
+                "learning": heard.enrolling}
 
 
 class _Base(SensorEntity):

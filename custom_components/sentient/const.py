@@ -21,6 +21,8 @@ CONF_AI_TASK_ENTITY = "ai_task_entity"
 CONF_SECOND_OPINION = "second_opinion_ai"
 CONF_NOTIFY_TARGETS = "notify_targets"
 CONF_CHIME = "chime"
+CONF_VOICE_ID_URL = "voice_id_url"
+CONF_VOICE_STT_BASE = "voice_stt_base"
 CONF_DIGEST_TIME = "digest_time"
 CONF_MORNING_BRIEFING = "morning_briefing"
 CONF_WELCOME = "welcome_home"
@@ -124,6 +126,7 @@ EVENT_ROUTINES_CHANGED = f"{DOMAIN}_routines_changed"
 EVENT_VISITOR = f"{DOMAIN}_visitor"
 EVENT_HEALTH_CHANGED = f"{DOMAIN}_health_changed"
 EVENT_MODE_CHANGED = f"{DOMAIN}_mode_changed"
+EVENT_SPEAKER = f"{DOMAIN}_speaker"
 
 # Memory
 MEMORY_CATEGORIES = ["fact", "preference", "person", "routine", "note"]

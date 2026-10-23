@@ -1,0 +1,20 @@
+name: Sentient Voice ID
+version: "0.1.0"
+slug: sentient_voice_id
+description: Recognises who in the house is speaking — locally — for the Sentient integration.
+url: https://github.com/suncy1983-hash/sentient-hu
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: services
+boot: auto
+# No ports: only Home Assistant (and other apps) on the internal network can reach it.
+options:
+  threshold: 0.7
+  margin: 0.06
+  learn: true
+schema:
+  threshold: float(0.3,0.95)
+  margin: float(0,0.5)
+  learn: bool

@@ -35,6 +35,8 @@ from .const import (
     CONF_SECOND_OPINION,
     CONF_NOTIFY_TARGETS,
     CONF_CHIME,
+    CONF_VOICE_ID_URL,
+    CONF_VOICE_STT_BASE,
     CONF_DIGEST_TIME,
     CONF_MORNING_BRIEFING,
     CONF_WELCOME,
@@ -100,6 +102,9 @@ GROUPS: list[tuple[str, str, str, str, list[str]]] = [
         CONF_PERSONA, CONF_SPEAKERS, CONF_DEFAULT_SPEAKER, CONF_FALLBACK_SPEAKERS, CONF_CHIME, CONF_SPEAK_VOLUME,
         CONF_NIGHT_VOLUME, CONF_DUCK_MEDIA, CONF_ALL_OCCUPIED,
         CONF_CHATTINESS, CONF_BANNED_WORDS, CONF_HOUSE_RULES,
+    ]),
+    ("voices", "Voice recognition", "mdi:account-voice", "Who is speaking: the Voice ID app and the speech-to-text it sits on.", [
+        CONF_VOICE_STT_BASE, CONF_VOICE_ID_URL,
     ]),
     ("quiet", "Quiet & rooms", "mdi:weather-night", "When to keep it down and how rooms are worked out.", [
         CONF_QUIET_START, CONF_QUIET_END, CONF_MOTION_WINDOW, CONF_PASS_THROUGH_AREAS,

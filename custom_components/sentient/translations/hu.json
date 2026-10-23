@@ -44,7 +44,9 @@
           "battery_threshold": "Alacsony akkumulátor ez alatt",
           "health_ignore": "Kihagyás a ház állapotából",
           "second_opinion_ai": "Második vélemény AI",
-          "chime": "Csengőhang beszéd előtt"
+          "chime": "Csengőhang beszéd előtt",
+          "voice_stt_base": "A hangfelismerés mögötti beszédfelismerő",
+          "voice_id_url": "A Voice ID app címe"
         },
         "data_description": {
           "motion_window": "Hány perc mozgáselőzményt vegyen figyelembe, amikor eldönti, hol vannak az emberek.",
@@ -70,7 +72,9 @@
           "face_sensor": "Opcionális: arcfelismerő érzékelő, amelynek állapota az épp felismert név (pl. Frigate). A naplóban és – ha be van kapcsolva – a bejelentésben használja.",
           "sidebar_panel": "Egy oldal az oldalsávban az emlékekkel, rutinokkal, figyelésekkel, látogatókkal és az elhangzottakkal.",
           "chat_agent": "Ki válaszol az oldal Kérdés mezőjére – válassz egy hangagentet, amelyiknél be van pipálva a Sentient. Üresen az alapértelmezett Assist folyamatot használja.",
-          "health_ignore": "Entitások (és eszközeik), amelyek nem számítanak hibának, pl. valami, aminek ki kell lennie kapcsolva."
+          "health_ignore": "Entitások (és eszközeik), amelyek nem számítanak hibának, pl. valami, aminek ki kell lennie kapcsolva.",
+          "voice_stt_base": "A Sentient hang-STT-je ennek adja tovább a hangot a szövegért (pl. Home Assistant Cloud). Üresen az első másikat használja.",
+          "voice_id_url": "Ahol a Sentient Voice ID app figyel, pl. http://xxxxxxxx-sentient-voice-id:8765. Üresen a hangfelismerés ki van kapcsolva."
         }
       }
     },
@@ -150,7 +154,9 @@
           "night_watch_announce": "Riasztások hangos bemondása, csendes órákban is",
           "night_watch_speakers": "Riasztások bemondása ezeken",
           "warm_by_weekdays": "Meleg legyen ekkorra (hétköznap)",
-          "warm_by_weekends": "Meleg legyen ekkorra (hétvégén)"
+          "warm_by_weekends": "Meleg legyen ekkorra (hétvégén)",
+          "voice_stt_base": "A hangfelismerés mögötti beszédfelismerő",
+          "voice_id_url": "A Voice ID app címe"
         },
         "data_description": {
           "motion_window": "Hány perc mozgáselőzményt vegyen figyelembe, amikor eldönti, hol vannak az emberek.",
@@ -202,7 +208,9 @@
           "night_watch_announce": "A szokatlan nyitást, amikor senki nincs fent, azonnal bemondja, csendes órákban, némításkor és vendégmódban is – lehet, hogy olyan valaki az, akinek nem kéne ott lennie.",
           "night_watch_speakers": "Üresen minden hangszóró.",
           "warm_by_weekdays": "Opcionális: hétköznap mikorra legyen meleg. Üresen a tanult felkelési időt használja.",
-          "warm_by_weekends": "Opcionális: ugyanez szombatra és vasárnapra."
+          "warm_by_weekends": "Opcionális: ugyanez szombatra és vasárnapra.",
+          "voice_stt_base": "A Sentient hang-STT-je ennek adja tovább a hangot a szövegért (pl. Home Assistant Cloud). Üresen az első másikat használja.",
+          "voice_id_url": "Ahol a Sentient Voice ID app figyel, pl. http://xxxxxxxx-sentient-voice-id:8765. Üresen a hangfelismerés ki van kapcsolva."
         }
       },
       "memories": {
@@ -269,6 +277,9 @@
       },
       "health": {
         "name": "A ház állapota"
+      },
+      "speaker": {
+        "name": "Beszélő"
       }
     },
     "switch": {
@@ -280,6 +291,11 @@
       },
       "chime": {
         "name": "Csengőhang"
+      }
+    },
+    "stt": {
+      "voice_stt": {
+        "name": "Hangfelismerő beszédfelismerés"
       }
     }
   },
