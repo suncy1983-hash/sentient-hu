@@ -15,6 +15,7 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_NOTIFY_TARGETS, CONF_NOTIFY_WHEN, CONF_PERSONA, DEFAULT_NOTIFY_WHEN, DEFAULT_PERSONA
+from . import i18n
 from .timeline import EVENT_TIMELINE
 
 _LOGGER = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ class Notifier:
             return
         self._sent[text.lower()] = now
         persona = self.options.get(CONF_PERSONA) or DEFAULT_PERSONA
-        self.hass.async_create_task(self._send(targets, f"{persona} · {title}", text), eager_start=True)
+        self.hass.async_create_task(self._send(targets, f"{persona} · {i18n.title(title)}", text), eager_start=True)
 
     async def _send(self, targets: list[str], title: str, message: str) -> None:
         try:

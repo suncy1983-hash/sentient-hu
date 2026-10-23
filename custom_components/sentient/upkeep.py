@@ -39,6 +39,8 @@ from .const import (
     DEFAULT_BRIEFING_SECTIONS,
     DEFAULT_PERSONA,
 )
+from . import i18n
+from .i18n import t
 from .watches import local_when
 
 if TYPE_CHECKING:
@@ -269,7 +271,7 @@ class Upkeep:
         rt = self._rt()
         items = list(reversed(rt.timeline.since(hours, ["said", "held", "visitor", "watch", "light", "health", "mode", "energy", "critical"], 150)))
         if not items:
-            text = "A quiet day — nothing to report."
+            text = t("digest.quiet")
         else:
             lines = []
             for i in items:
@@ -279,12 +281,12 @@ class Upkeep:
                 "Sentient: daily digest",
                 "Summarise this home's log in three or four short, friendly sentences for the family: "
                 "visitors, anything that went wrong or needs doing, notable things said. Skip routine "
-                "chatter and repeated items. Plain sentences, British English, no lists, no entity IDs. "
+                "chatter and repeated items. Plain sentences, no lists, no entity IDs. "
                 "Never say or imply the house is or was empty.\n\n" + "\n".join(lines),
                 None,
             )
-            text = str(result or "").strip() or "Nothing worth mentioning."
-        rt.timeline.add("digest", text, f"last {int(hours)} hours")
+            text = str(result or "").strip() or t("digest.nothing")
+        rt.timeline.add("digest", text, t("digest.last_hours", hours=int(hours)))
         return {"digest": text, "entries": len(items)}
 
     @callback
@@ -328,7 +330,7 @@ class Upkeep:
 
     async def _ai(self, task: str, instructions: str, structure: dict | None) -> Any:
         rt = self._rt()
-        data: dict[str, Any] = {"task_name": task, "instructions": instructions}
+        data: dict[str, Any] = {"task_name": task, "instructions": instructions + i18n.write_in()}
         if structure:
             data["structure"] = structure
         if ai_entity := rt.options.get(CONF_AI_TASK_ENTITY):
@@ -350,7 +352,7 @@ class Upkeep:
         text = await self._ai(
             "Sentient: briefing",
             f"You are {persona}, the brain of a family home. Write a spoken briefing of two to four short, "
-            "natural sentences in British English from these facts. Lead with what needs doing; skip "
+            "natural sentences from these facts. Lead with what needs doing; skip "
             "anything empty; no lists, no IDs, no forms of address."
             + (f"\nHouse rules:\n{rules}" if rules else "")
             + f"\nFacts: {facts}",

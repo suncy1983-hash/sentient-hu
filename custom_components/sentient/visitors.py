@@ -41,6 +41,8 @@ from .const import (
     DOMAIN,
     EVENT_VISITOR,
 )
+from . import i18n
+from .i18n import t
 from .watches import local_when
 
 if TYPE_CHECKING:
@@ -209,17 +211,17 @@ class Visitors:
         was = self.parcel_waiting
         self.parcel_waiting = there
         if there and not was:
-            what = (result.get("description") or "a parcel").strip().rstrip(".")
+            what = (result.get("description") or t("visitors.a_parcel")).strip().rstrip(".")
             self.log.appendleft({
                 "name": None,
                 "time": dt_util.now().isoformat(),
                 "kind": "delivery",
-                "description": f"someone left {what} without ringing",
+                "description": t("visitors.left_without_ringing", what=what),
                 "parcel": True,
                 "parcel_left": True,
                 "trigger": "doorstep",
             })
-            await self.speech.async_say("A parcel's been left at the front door.", "normal", None, source="visitors")
+            await self.speech.async_say(t("visitors.parcel_left"), "normal", None, source="visitors")
         self._save()
         return there
 
@@ -227,7 +229,7 @@ class Visitors:
     async def _look(self, task: str, instructions: str, structure: dict) -> dict[str, Any]:
         data: dict[str, Any] = {
             "task_name": task,
-            "instructions": instructions,
+            "instructions": instructions + i18n.write_in(),
             "structure": structure,
             "attachments": [
                 {"media_content_id": f"media-source://camera/{self.camera}", "media_content_type": "image/jpeg"}
@@ -276,7 +278,7 @@ class Visitors:
             "name": name,
             "time": dt_util.now().isoformat(),
             "kind": kind,
-            "description": (result.get("description") or "someone at the door").strip().rstrip("."),
+            "description": (result.get("description") or t("visitors.someone")).strip().rstrip("."),
             "parcel": bool(result.get("parcel")),
             "parcel_left": False,
             "trigger": trigger,
@@ -284,7 +286,8 @@ class Visitors:
         self.log.appendleft(visit)
         self._save()
         if self.options.get(CONF_ANNOUNCE_VISITORS, DEFAULT_ANNOUNCE_VISITORS) and kind != "nobody":
-            line = f"{name}'s at the door." if name else f"Someone's at the door: {visit['description']}."
+            line = (t("visitors.named_at_door", name=name) if name
+                    else t("visitors.someone_at_door", description=visit["description"]))
             await self.speech.async_say(line, "normal", None, source="visitors")
         if (kind == "delivery" or visit["parcel"]) and self.options.get(CONF_PARCEL_ALERTS, DEFAULT_PARCEL_ALERTS):
             @callback
@@ -312,4 +315,4 @@ class Visitors:
             visit["parcel_left"] = True
             self.parcel_waiting = True
             self._save()
-            await self.speech.async_say("A parcel's been left at the front door.", "normal", None, source="visitors")
+            await self.speech.async_say(t("visitors.parcel_left"), "normal", None, source="visitors")

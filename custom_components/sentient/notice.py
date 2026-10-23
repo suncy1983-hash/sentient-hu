@@ -13,8 +13,6 @@ The user picks the things worth noticing. When they change:
 
 from __future__ import annotations
 
-import re
-
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -39,6 +37,7 @@ from .const import (
     DEFAULT_PERSONA,
     EVENT_NOTICED,
 )
+from . import i18n
 from .presence import area_of
 
 if TYPE_CHECKING:
@@ -71,7 +70,7 @@ class Change:
         return f"{dt_util.as_local(self.when):%H:%M} {self.name}{where} changed{was} to {self.new}{unit}"
 
 
-_FINISHED_WORDS = re.compile(r"\b(finished|done|ready|complete|completed|boiled|has stopped)\b", re.I)
+_FINISHED_WORDS = i18n.FINISHED_WORDS  # English and Hungarian
 _FINISHED_STATES = {"off", "idle", "standby", "done", "complete", "completed", "finished", "ready", "docked",
                     "returning", "paused", "stopped", "end", "clean", "dry", "keep_warm", "keep warm"}
 _STARTED_STATES = {"on", "heating", "running", "boiling", "cleaning", "washing", "drying", "spinning", "active",
@@ -296,9 +295,10 @@ class Noticer:
             "mean it has just STARTED — never say something has finished, is done or is ready unless its new "
             "state says so (e.g. it went from heating/running to standby/off/idle/done). Don't copy earlier "
             "remarks. "
-            "If you speak, write one short, natural sentence in British English, no IDs or entity names "
+            "If you speak, write one short, natural sentence, no IDs or entity names "
             "in code form, no forms of address. Set question to true only if you're offering to do "
             "something and need a yes or no (e.g. 'It's got chilly, shall I put the heating on?')."
+            + i18n.write_in()
         )
         data: dict[str, Any] = {
             "task_name": "Sentient: worth saying?",

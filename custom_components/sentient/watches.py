@@ -29,6 +29,8 @@ from homeassistant.helpers.event import async_track_point_in_utc_time, async_tra
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from . import i18n
+from .i18n import t
 from .const import (
     CONF_AI_TASK_ENTITY,
     CONF_SECOND_OPINION,
@@ -113,14 +115,13 @@ def local_when(when: datetime) -> str:
     12-hour wording because voice models read it aloud more reliably than 17:18.
     """
     local = dt_util.as_local(when)
-    hour = local.hour % 12 or 12
-    clock = f"{hour}{'' if local.minute == 0 else f':{local.minute:02d}'}{'am' if local.hour < 12 else 'pm'}"
+    clock = i18n.clock(local.hour, local.minute)
     days = (local.date() - dt_util.now().date()).days
     if days == 0:
-        return f"{clock} today"
+        return t("when.today", clock=clock)
     if days == 1:
-        return f"{clock} tomorrow"
-    return f"{clock} on {local:%A} {local.day} {local:%B}"
+        return t("when.tomorrow", clock=clock)
+    return t("when.other", clock=clock, date=i18n.day_and_date(local))
 
 
 def parse_until(value: str | None, minutes: float | None, default_hours: float) -> datetime:
@@ -376,10 +377,12 @@ class WatchManager:
     def cancel(self, id_or_words: str) -> Watch | None:
         watch = self._watches.get(id_or_words)
         if watch is None:
-            words = set(re.findall(r"[a-z0-9]+", id_or_words.lower())) - {"the", "a", "watch", "watching", "on", "for"}
+            from .memory import _words  # accent-blind words in any language
+
+            words = _words(id_or_words) - {"watch", "watching", "figyeles", "figyelest", "figyeld", "figyelj"}
             best, score = None, 0
             for w in self._watches.values():
-                hay = set(re.findall(r"[a-z0-9]+", f"{w.what} {w.entity_id} {w.look_for or ''}".lower()))
+                hay = _words(f"{w.what} {w.entity_id.replace('.', ' ').replace('_', ' ')} {w.look_for or ''}")
                 s = len(words & hay)
                 if s > score:
                     best, score = w, s
@@ -483,6 +486,7 @@ class WatchManager:
                 f"You are checking a home camera image. Question: {watch.question} "
                 "Answer true only if the image clearly shows it. If true, add one short, natural "
                 "sentence suitable for speaking aloud, without camera names, IDs or times."
+                + i18n.write_in()
             ),
             "structure": {
                 "answer": {"description": "True if the image clearly shows it", "required": True,
@@ -539,6 +543,7 @@ class WatchManager:
                 f"Look at this home camera image and answer: {question} "
                 "Reply in one or two short spoken sentences. Describe only what is visible; "
                 "if it's too dark or unclear, say so. No camera names, IDs or timestamps."
+                + i18n.write_in()
             ),
             "attachments": [
                 await self._attachment(
@@ -576,5 +581,6 @@ class WatchManager:
     def _default_message(self, watch: Watch, state: State | None) -> str:
         if state is not None:
             unit = state.attributes.get("unit_of_measurement") or ""
-            return f"{state.name} is now {state.state}{(' ' + unit) if unit else ''}."
-        return f"Heads up: {watch.what}."
+            return t("watch.now", name=state.name,
+                     state=f"{i18n.state_word(state.state)}{(' ' + unit) if unit else ''}")
+        return t("watch.heads_up", what=watch.what)

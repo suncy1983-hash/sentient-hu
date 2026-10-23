@@ -35,6 +35,7 @@ from .const import (
     CONF_WARM_BY_WEEKENDS,
     DOMAIN,
 )
+from .i18n import t
 from .presence import inside_sensors
 
 if TYPE_CHECKING:
@@ -137,8 +138,8 @@ def usual_wake(
                 by_day.setdefault(local.date(), []).append((local, entity_id))
     first: dict[Any, int] = {}
     for times in (switched or {}).values():
-        for t in times:
-            local = dt_util.as_local(t)
+        for when in times:
+            local = dt_util.as_local(when)
             if WAKE_FROM <= local.time() < WAKE_UNTIL:
                 minute = local.hour * 60 + local.minute
                 if minute < first.get(local.date(), 1440):
@@ -147,10 +148,10 @@ def usual_wake(
         if day in first:
             continue
         events.sort()
-        for i, (t, _e) in enumerate(events):
-            burst = [e for (u, e) in events[i:] if u - t <= UP_SPAN]
+        for i, (moved, _e) in enumerate(events):
+            burst = [e for (u, e) in events[i:] if u - moved <= UP_SPAN]
             if len(burst) >= UP_EVENTS and len(set(burst)) >= UP_ROOMS:
-                first[day] = t.hour * 60 + t.minute
+                first[day] = moved.hour * 60 + moved.minute
                 break
     out: dict[str, int | None] = {}
     for label, keep in (("weekdays", lambda d: d.weekday() < 5), ("weekends", lambda d: d.weekday() >= 5)):
@@ -407,7 +408,8 @@ class Heating:
             self._save()
             return
         self.timeline.add(
-            "heating", f"Warming {st.name} to {comfort:g}° for when people are up", f"usually up around {clock(wake)}"
+            "heating", t("heating.warming", name=st.name, comfort=f"{comfort:g}"),
+            t("heating.usually_up", clock=clock(wake)),
         )
 
     async def _async_restore(self, entity_id: str, boost: dict[str, Any]) -> None:

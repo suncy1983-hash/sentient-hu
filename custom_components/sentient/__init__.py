@@ -37,6 +37,7 @@ from .const import (
     DEFAULT_SIDEBAR,
     CONF_PERSONA,
 )
+from . import i18n
 from .llm_api import SentientAPI
 from .memory import MemoryStore
 from .presence import ActivityTracker
@@ -182,6 +183,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> bool:
+    i18n.set_language(hass.config.language)
     options = _entry_options(entry)
     memory = MemoryStore(hass, entry.entry_id)
     await memory.async_load()

@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 import re
 from typing import Any
+import unicodedata
 import uuid
 
 from homeassistant.core import HomeAssistant, callback
@@ -25,16 +26,53 @@ from .const import (
     MEMORY_STORAGE_VERSION,
 )
 
-_WORD = re.compile(r"[a-z0-9']+")
-_STOP = {
+# Any letters or digits, in any alphabet ("kút", "nyúlketrec"), with an optional apostrophe part.
+_WORD = re.compile(r"[^\W_]+(?:'[^\W_]+)?")
+
+
+def _fold(text: str) -> str:
+    """Lower case without accents, so 'Kút', 'kut' and 'kúthoz' all meet at 'kut'."""
+    decomposed = unicodedata.normalize("NFKD", text.lower())
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
+_STOP = {_fold(w) for w in (
+    # English
     "the", "a", "an", "is", "are", "was", "to", "of", "and", "in", "on", "at",
     "it", "my", "me", "i", "you", "do", "does", "what", "who", "when", "where",
     "for", "with", "that", "this", "about", "like", "likes",
-}
+    # Hungarian
+    "az", "egy", "és", "is", "van", "vannak", "volt", "voltak", "lesz", "hogy", "nem", "de", "meg",
+    "mi", "mit", "mik", "ki", "kit", "hol", "hova", "honnan", "mikor", "miért", "milyen", "melyik",
+    "ez", "ezt", "azt", "ezek", "azok", "itt", "ott", "én", "te", "ő", "ti", "ők", "nekem", "neked",
+    "nekünk", "nektek", "nála", "nálunk", "mint", "csak", "már", "még", "kell", "szeret", "szereti",
+    "szeretjük", "pedig", "vagy", "akkor", "amikor", "mert", "ha", "sem", "se", "nagyon", "minden",
+    "emlékezz", "emlékszel", "jegyezd", "tudod", "tudni", "rá", "erre", "arra", "róla",
+)}
 
 
 def _words(text: str) -> set[str]:
-    return {w for w in _WORD.findall(text.lower()) if w not in _STOP and len(w) > 1}
+    return {w for w in _WORD.findall(_fold(text)) if w not in _STOP and len(w) > 1}
+
+
+def _related(a: str, b: str) -> bool:
+    """Word forms of the same thing: rabbit/rabbits, nyul/nyulak/nyulketrec, kutya/kutyat."""
+    if a == b:
+        return False
+    short, long = (a, b) if len(a) <= len(b) else (b, a)
+    if len(short) < 3:
+        return False
+    if long.startswith(short):  # a stem with an ending: kut / kuthoz, rabbit / rabbits
+        return True
+    if len(short) >= 4 and short in long:  # part of a compound: ketrec / nyulketrec
+        return True
+    # a shared stem that is most of the shorter word: nyulak / nyulketrec, kavet / kaveja
+    common = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        common += 1
+    return common >= 4 and common >= 0.6 * len(short)
 
 
 @dataclass
@@ -139,10 +177,8 @@ class MemoryStore:
         for memory in self._items:
             words = _words(memory.text)
             score = len(q & words)
-            # partial matches (rabbit / rabbits)
-            score += 0.5 * sum(
-                1 for a in q for b in words if a != b and (a in b or b in a) and len(a) > 3
-            )
+            # partial matches (rabbit / rabbits, nyúl / nyulakat / nyúlketrec)
+            score += 0.5 * sum(1 for a in q for b in words if _related(a, b))
             if score:
                 scored.append((score, memory))
         scored.sort(key=lambda s: (s[0], s[1].created), reverse=True)

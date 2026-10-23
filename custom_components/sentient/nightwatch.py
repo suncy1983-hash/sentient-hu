@@ -33,6 +33,7 @@ from .const import (
     CONF_NIGHT_WATCH_SPEAKERS,
     DEFAULT_NIGHT_WATCH,
 )
+from .i18n import t
 from .presence import inside_sensors
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,12 +67,12 @@ def how_usual(openings: list[datetime], when: datetime, days_known: int) -> dict
     minute = when.hour * 60 + when.minute
     same_days = max(1, round(days_known * (2 / 7 if weekend else 5 / 7)))
     near_days = set()
-    for t in openings:
-        if (t.weekday() >= 5) != weekend:
+    for opened in openings:
+        if (opened.weekday() >= 5) != weekend:
             continue
-        diff = abs(t.hour * 60 + t.minute - minute)
+        diff = abs(opened.hour * 60 + opened.minute - minute)
         if min(diff, 1440 - diff) <= NEAR_MIN:
-            near_days.add(t.date())
+            near_days.add(opened.date())
     times = len(near_days)
     return {"times": times, "share": times / same_days, "rare": times <= RARE_COUNT and times / same_days < RARE_SHARE}
 
@@ -190,18 +191,18 @@ class NightWatch:
         record = {"time": local.isoformat(), "entity_id": new.entity_id, "name": new.name, "inside": verdict["inside"]}
         self.events = [record, *self.events][:30]
         if verdict["inside"]:
-            rt.timeline.add("noticed", f"{new.name} opened at {local:%H:%M}, not a usual time",
-                            f"someone was up inside first ({verdict['inside']}), so not alerting")
+            rt.timeline.add("noticed", t("night.noted", name=new.name, time=f"{local:%H:%M}"),
+                            t("night.someone_up", inside=str(verdict["inside"])))
             return
         now = dt_util.utcnow()
         if (last := self._last_alert.get(new.entity_id)) and now - last < REPEAT:
             return
         self._last_alert[new.entity_id] = now
         record["alert"] = True
-        text = f"{new.name} opened at {local:%H:%M}. Nobody was moving inside and it doesn't normally open at this time."
-        rt.timeline.add("security", text, "night watch", alert=True)
+        text = t("night.alert", name=new.name, time=f"{local:%H:%M}")
+        rt.timeline.add("security", text, t("night.detail"), alert=True)
         if self.options.get(CONF_NIGHT_WATCH_ANNOUNCE):
-            spoken = f"Heads up: the {new.name.lower()} has just opened, and nobody's been moving inside."
+            spoken = t("night.spoken", name=new.name)
             speakers = list(self.options.get(CONF_NIGHT_WATCH_SPEAKERS) or []) or None
             self.hass.async_create_task(rt.speech.async_say(spoken, "urgent", speakers, source="night_watch"))
 

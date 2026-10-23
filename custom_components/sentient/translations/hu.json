@@ -1,0 +1,592 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ismerd meg az otthonod agyát",
+        "description": "Adj neki nevet. Így hívja magát, és így jelenik meg a Home Assistantban.",
+        "data": {
+          "persona": "Név"
+        }
+      },
+      "speech": {
+        "title": "Hogyan beszéljen a ház?",
+        "description": "Válaszd ki a hangműholdakat, amelyeken keresztül beszélhet. Ott szólal meg, ahol emberek vannak (mozgás, vagy valaki épp egy hangszóróhoz beszél), különben az alapértelmezett hangszórón.",
+        "data": {
+          "speakers": "Hangszórók",
+          "default_speaker": "Alapértelmezett hangszóró",
+          "quiet_start": "Csendes órák kezdete",
+          "quiet_end": "Csendes órák vége",
+          "motion_window": "Szobafigyelés időablaka",
+          "banned_words": "Ezeket a szavakat soha ne használja (vesszővel elválasztva)",
+          "suppress_entities": "Maradjon csendben ezek után az automatizációk vagy scriptek után",
+          "suppress_seconds": "Ennyi ideig maradjon csendben",
+          "prompt_memories": "Hangasszisztenseknek átadott emlékek száma",
+          "pass_through_areas": "Átjáró helyiségek",
+          "all_occupied": "Minden lakott szobában szóljon",
+          "ai_task_entity": "AI a kamerás ellenőrzésekhez",
+          "camera_cooldown": "Legkisebb szünet a kamerás ellenőrzések között",
+          "fallback_speakers": "Csak tartalék hangszórók",
+          "daily_ai_limit": "Kamerás ellenőrzések naponta",
+          "notice_entities": "Mit figyeljen",
+          "chattiness": "Mennyire legyen beszédes",
+          "house_rules": "Házszabályok",
+          "learn_entities": "Rutinok tanulása ezekből",
+          "link_triggers": "Azt is tanulja meg, mi követi ezeket",
+          "suggest_routines": "Ajánlja fel a rutinok átvételét",
+          "door_camera": "Ajtókamera",
+          "door_triggers": "Csengő",
+          "announce_visitors": "Mondja be, ki van az ajtónál",
+          "parcel_alerts": "Szóljon, ha csomagot hagytak",
+          "doorstep_sensors": "Csomagellenőrzés az itt észlelt látogatások után",
+          "face_sensor": "Felismert név forrása",
+          "sidebar_panel": "Megjelenés az oldalsávban",
+          "chat_agent": "Csevegő agent az oldalsáv oldalhoz",
+          "battery_threshold": "Alacsony akkumulátor ez alatt",
+          "health_ignore": "Kihagyás a ház állapotából",
+          "second_opinion_ai": "Második vélemény AI",
+          "chime": "Csengőhang beszéd előtt"
+        },
+        "data_description": {
+          "motion_window": "Hány perc mozgáselőzményt vegyen figyelembe, amikor eldönti, hol vannak az emberek.",
+          "suppress_entities": "pl. a csengő bejelentése, hogy a háttérmegjegyzések ne beszéljenek rá.",
+          "prompt_memories": "Hány emléket kap meg előre a hangasszisztens. A többiben továbbra is kereshet.",
+          "pass_through_areas": "Folyosók, előterek, lépcsők. Az itteni áthaladás sokkal kevesebbet számít, így egy arra járó nem viszi el a bejelentést.",
+          "all_occupied": "Be: mindenki hallja, aki otthon van. Ki: csak a legforgalmasabb szoba.",
+          "ai_task_entity": "A kamerás figyelések használják. Hagyd üresen a Home Assistant alapértelmezett AI Task-jához.",
+          "camera_cooldown": "Egy kamerás figyelés legfeljebb ilyen gyakran néz újra, hogy kevés legyen az AI-hívás.",
+          "fallback_speakers": "Csak akkor használja, ha egyik másik hangszóró szobájában sincs senki, pl. egy nappali, amit inkább nem zavarnál.",
+          "daily_ai_limit": "Ennyi után aznapra leállnak a háttérben futó kamerás ellenőrzések. A kérdéseidre ezután is válaszol.",
+          "notice_entities": "Ha ezek változnak, az AI eldönti, érdemes-e szólni (vagy kérdezni). pl. mosógép, ajtók, időjárás, kukák.",
+          "chattiness": "Óránkénti megjegyzések korlátja: csendes 2, normál 4, beszédes 8. Ki: nem figyel.",
+          "house_rules": "Egyszerű mondatok, amiket minden hangnak be kell tartania, soronként egy, pl. 'Soha ne mondd, hogy üres a ház.'",
+          "learn_entities": "Lámpák, kapcsolók, ventilátorok és redőnyök, amiket kézzel használtok. Minden éjjel átnézi az elmúlt két hetet: mit csináltok a legtöbb nap nagyjából ugyanakkor, és mit rögtön valami más után (ajtónyitás, egy másik lámpa felkapcsolása).",
+          "link_triggers": "Opcionális: további dolgok, amik elindíthatnak egy szokást (a TV bekapcsolása, ágyérzékelő…). Az ajtókat, ablakokat és a tanult lámpákat mindig figyelembe veszi.",
+          "suggest_routines": "Minden új rutinnál egyszer, napközben, amikor valaki otthon van, megkérdezi, csinálja-e ezt mostantól a ház.",
+          "door_camera": "Csengetéskor egyszer belenéz, hogy feljegyezze, ki jött.",
+          "door_triggers": "A csengőgomb (bináris érzékelő vagy esemény), vagy bármi más, ami azt jelenti, hogy valaki az ajtónál van.",
+          "announce_visitors": "Kikapcsolva csak csendes napló készül, amiből a hangasszisztensek válaszolni tudnak.",
+          "parcel_alerts": "Kézbesítés után pár perccel újra megnézi, és szól, ha csomagot hagytak.",
+          "doorstep_sensors": "Opcionális: személyérzékelők a bejárathoz vagy az előkerthez (pl. egy Frigate zóna személyérzékelője). Ha ott csengetés nélkül ér véget egy látogatás, egyszer megnézi az ajtókamerát, hagytak-e csomagot vagy levelet.",
+          "face_sensor": "Opcionális: arcfelismerő érzékelő, amelynek állapota az épp felismert név (pl. Frigate). A naplóban és – ha be van kapcsolva – a bejelentésben használja.",
+          "sidebar_panel": "Egy oldal az oldalsávban az emlékekkel, rutinokkal, figyelésekkel, látogatókkal és az elhangzottakkal.",
+          "chat_agent": "Ki válaszol az oldal Kérdés mezőjére – válassz egy hangagentet, amelyiknél be van pipálva a Sentient. Üresen az alapértelmezett Assist folyamatot használja.",
+          "health_ignore": "Entitások (és eszközeik), amelyek nem számítanak hibának, pl. valami, aminek ki kell lennie kapcsolva."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "A Sentient már be van állítva."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Sentient",
+        "menu_options": {
+          "settings": "Beállítások",
+          "briefing": "Összefoglalók",
+          "memories": "Emlékek"
+        }
+      },
+      "settings": {
+        "title": "Beállítások",
+        "data": {
+          "persona": "Név",
+          "speakers": "Hangszórók",
+          "default_speaker": "Alapértelmezett hangszóró",
+          "quiet_start": "Csendes órák kezdete",
+          "quiet_end": "Csendes órák vége",
+          "motion_window": "Szobafigyelés időablaka",
+          "banned_words": "Ezeket a szavakat soha ne használja (vesszővel elválasztva)",
+          "suppress_entities": "Maradjon csendben ezek után az automatizációk vagy scriptek után",
+          "suppress_seconds": "Ennyi ideig maradjon csendben",
+          "prompt_memories": "Hangasszisztenseknek átadott emlékek száma",
+          "pass_through_areas": "Átjáró helyiségek",
+          "all_occupied": "Minden lakott szobában szóljon",
+          "ai_task_entity": "AI a kamerás ellenőrzésekhez",
+          "camera_cooldown": "Legkisebb szünet a kamerás ellenőrzések között",
+          "fallback_speakers": "Csak tartalék hangszórók",
+          "daily_ai_limit": "Kamerás ellenőrzések naponta",
+          "notice_entities": "Mit figyeljen",
+          "chattiness": "Mennyire legyen beszédes",
+          "house_rules": "Házszabályok",
+          "learn_entities": "Rutinok tanulása ezekből",
+          "link_triggers": "Azt is tanulja meg, mi követi ezeket",
+          "suggest_routines": "Ajánlja fel a rutinok átvételét",
+          "door_camera": "Ajtókamera",
+          "door_triggers": "Csengő",
+          "announce_visitors": "Mondja be, ki van az ajtónál",
+          "parcel_alerts": "Szóljon, ha csomagot hagytak",
+          "doorstep_sensors": "Csomagellenőrzés az itt észlelt látogatások után",
+          "face_sensor": "Felismert név forrása",
+          "sidebar_panel": "Megjelenés az oldalsávban",
+          "chat_agent": "Csevegő agent az oldalsáv oldalhoz",
+          "battery_threshold": "Alacsony akkumulátor ez alatt",
+          "health_ignore": "Kihagyás a ház állapotából",
+          "second_opinion_ai": "Második vélemény AI",
+          "notify_targets": "Értesítendő telefonok",
+          "notify_when": "Küldés telefonra",
+          "chime": "Csengőhang beszéd előtt",
+          "welcome_home": "Hazaérkezők üdvözlése",
+          "welcome_people": "Kiket üdvözöljön",
+          "speak_volume": "Beszédhangerő",
+          "night_volume": "Beszédhangerő a csendes órákban",
+          "duck_media": "Zene és TV lehalkítása beszéd közben",
+          "critical_alerts": "Biztonsági riasztások",
+          "critical_ignore": "Ezeket soha ne kezelje biztonsági riasztásként",
+          "energy_insight": "Energiafigyelés",
+          "energy_price": "Áramár",
+          "left_open_minutes": "Nyitva hagyott ajtók és ablakok említése ennyi után",
+          "left_open_ignore": "Ezeket ne említse",
+          "leaving_check": "Ellenőrzés, amikor mindenki elmegy",
+          "critical_extra": "Ezeket is kezelje biztonsági riasztásként",
+          "heating_entities": "Tanulandó fűtés",
+          "preheat": "Felfűtés, mire felkeltek",
+          "comfort_temp": "Felfűtési hőmérséklet",
+          "inside_sensors": "Belső mozgásérzékelők",
+          "weekly_report": "Heti jelentés",
+          "night_watch": "Éjszakai őrség",
+          "night_watch_entities": "Figyelt ajtók és kapuk",
+          "night_watch_announce": "Riasztások hangos bemondása, csendes órákban is",
+          "night_watch_speakers": "Riasztások bemondása ezeken",
+          "warm_by_weekdays": "Meleg legyen ekkorra (hétköznap)",
+          "warm_by_weekends": "Meleg legyen ekkorra (hétvégén)"
+        },
+        "data_description": {
+          "motion_window": "Hány perc mozgáselőzményt vegyen figyelembe, amikor eldönti, hol vannak az emberek.",
+          "suppress_entities": "pl. a csengő bejelentése, hogy a háttérmegjegyzések ne beszéljenek rá.",
+          "prompt_memories": "Hány emléket kap meg előre a hangasszisztens. A többiben továbbra is kereshet.",
+          "pass_through_areas": "Folyosók, előterek, lépcsők. Az itteni áthaladás sokkal kevesebbet számít, így egy arra járó nem viszi el a bejelentést.",
+          "all_occupied": "Be: mindenki hallja, aki otthon van. Ki: csak a legforgalmasabb szoba.",
+          "ai_task_entity": "A kamerás figyelések használják. Hagyd üresen a Home Assistant alapértelmezett AI Task-jához.",
+          "camera_cooldown": "Egy kamerás figyelés legfeljebb ilyen gyakran néz újra, hogy kevés legyen az AI-hívás.",
+          "fallback_speakers": "Csak akkor használja, ha egyik másik hangszóró szobájában sincs senki, pl. egy nappali, amit inkább nem zavarnál.",
+          "daily_ai_limit": "Ennyi után aznapra leállnak a háttérben futó kamerás ellenőrzések. A kérdéseidre ezután is válaszol.",
+          "notice_entities": "Ha ezek változnak, az AI eldönti, érdemes-e szólni (vagy kérdezni). pl. mosógép, ajtók, időjárás, kukák.",
+          "chattiness": "Óránkénti megjegyzések korlátja: csendes 2, normál 4, beszédes 8. Ki: nem figyel.",
+          "house_rules": "Egyszerű mondatok, amiket minden hangnak be kell tartania, soronként egy, pl. 'Soha ne mondd, hogy üres a ház.'",
+          "learn_entities": "Lámpák, kapcsolók, ventilátorok és redőnyök, amiket kézzel használtok. Minden éjjel átnézi az elmúlt két hetet: mit csináltok a legtöbb nap nagyjából ugyanakkor, és mit rögtön valami más után (ajtónyitás, egy másik lámpa felkapcsolása).",
+          "link_triggers": "Opcionális: további dolgok, amik elindíthatnak egy szokást (a TV bekapcsolása, ágyérzékelő…). Az ajtókat, ablakokat és a tanult lámpákat mindig figyelembe veszi.",
+          "suggest_routines": "Minden új rutinnál egyszer, napközben, amikor valaki otthon van, megkérdezi, csinálja-e ezt mostantól a ház.",
+          "door_camera": "Csengetéskor egyszer belenéz, hogy feljegyezze, ki jött.",
+          "door_triggers": "A csengőgomb (bináris érzékelő vagy esemény), vagy bármi más, ami azt jelenti, hogy valaki az ajtónál van.",
+          "announce_visitors": "Kikapcsolva csak csendes napló készül, amiből a hangasszisztensek válaszolni tudnak.",
+          "parcel_alerts": "Kézbesítés után pár perccel újra megnézi, és szól, ha csomagot hagytak.",
+          "doorstep_sensors": "Opcionális: személyérzékelők a bejárathoz vagy az előkerthez (pl. egy Frigate zóna személyérzékelője). Ha ott csengetés nélkül ér véget egy látogatás, egyszer megnézi az ajtókamerát, hagytak-e csomagot vagy levelet.",
+          "face_sensor": "Opcionális: arcfelismerő érzékelő, amelynek állapota az épp felismert név (pl. Frigate). A naplóban és – ha be van kapcsolva – a bejelentésben használja.",
+          "sidebar_panel": "Egy oldal az oldalsávban az emlékekkel, rutinokkal, figyelésekkel, látogatókkal és az elhangzottakkal.",
+          "chat_agent": "Ki válaszol az oldal Kérdés mezőjére – válassz egy hangagentet, amelyiknél be van pipálva a Sentient. Üresen az alapértelmezett Assist folyamatot használja.",
+          "health_ignore": "Entitások (és eszközeik), amelyek nem számítanak hibának, pl. valami, aminek ki kell lennie kapcsolva.",
+          "second_opinion_ai": "Opcionális: egy nagyobb modell, amit csak akkor kérdez, ha a szokásos szerint a kép túl sötét vagy homályos. Beleszámít a napi korlátba.",
+          "notify_targets": "Értesítési entitások, pl. a Home Assistant app az egyes telefonokon vagy órákon.",
+          "notify_when": "Minden fajta legfeljebb tízpercenként egyszer megy ki.",
+          "chime": "Ki: a bejelentések és kérdések azonnal, csengőhang nélkül indulnak.",
+          "welcome_home": "Ha valaki legalább 20 perc után hazaér, abban a szobában, ahol van, mondja: \"Üdv itthon!\" – és amit érdemes tudni a távollétéről (látogatók, befejeződött dolgok, hibák). Csendes órákban, némításkor és vendégmódban soha.",
+          "welcome_people": "Üresen mindenkit.",
+          "speak_volume": "Opcionális: a hangszóró hangereje, amíg a Sentient beszél; utána visszaáll. Üresen nem nyúl hozzá.",
+          "night_volume": "Opcionális: halkabb szint mindenhez, ami csendes órákban hangzik el (csak sürgős üzenetek).",
+          "duck_media": "Ami ugyanabban a szobában szól, azt lehalkítja, amíg a Sentient beszél, utána visszahangosítja.",
+          "critical_alerts": "A füst-, szén-monoxid-, gáz-, vízszivárgás- és szabotázsérzékelőket magától megtalálja, és a riasztó megszólalását is. Minden hangszórón elhangzik, csendes órákban, némításkor és vendégmódban is, kétszer megismétli, amíg tart, és telefonra is megy.",
+          "energy_insight": "Az Energia irányítópulton lévő eszközök mai fogyasztása az elmúlt héthez képest: Energia kártya, összefoglaló rész, hangeszköz és jegyzetek a szokatlan fogyasztásról. Kikapcsolva mindez eltűnik és leáll.",
+          "energy_price": "Opcionális: az egységár, hogy a mai költséget is mutassa.",
+          "left_open_minutes": "Egyszer szól (aztán félóránként, amíg nyitva van), a csendes órákat és némításokat a szokásos módon betartva. 0 kikapcsolja.",
+          "leaving_check": "Amikor az utolsó ember is elmegy, ami nyitva vagy bezáratlanul maradt, az idővonalra és telefonra kerül (\"Nyitva maradt\").",
+          "critical_extra": "Bármi más, amit bekapcsoláskor mindig mindenhol be kell mondani, pl. pánikgomb vagy fagyasztó-túl-meleg érzékelő. A riasztóközpont megszólalása mindig benne van.",
+          "heating_entities": "Termosztátok, amelyekből tanul. Üresen a ház összes termosztátja. Megtanulja, milyen gyorsan fűt fel mindegyik, és általában mekkora hőmérsékletre van állítva.",
+          "preheat": "Korábban indítja a fűtést, hogy mire szokás szerint felkeltek, meglegyen a szokásos hőmérséklet. A saját ütemezésű termosztátot utána visszaállítja arra, a kikapcsoltat kikapcsolva hagyja.",
+          "comfort_temp": "Opcionális: erre a hőmérsékletre fűtsön fel. Üresen a napközben szokásos beállítást használja.",
+          "inside_sensors": "Opcionális: mely mozgásérzékelők jelentik, hogy valaki bent van. Üresen a hangszórókkal azonos szinteken lévőket használja (a kerti és kamerás érzékelők nem számítanak). Az éjszakai őrséghez és a felkelési időkhöz kell.",
+          "weekly_report": "Vasárnap esténként az idővonalra teszi, mit tanult és vett észre a ház a héten (telefonra is megy, ha az összefoglalók mennek).",
+          "night_watch": "Megtanulja, mikor nyílik általában az egyes ajtó, kapu és ablak. Ha szokatlan időben nyílik, és előtte bent senki nem mozgott, az riasztás. Ha valaki már fent volt bent (pl. munkába indult), csak feljegyzi.",
+          "night_watch_entities": "Üresen minden ajtó-, ablak-, kapu- és garázskapu-érzékelő.",
+          "night_watch_announce": "A szokatlan nyitást, amikor senki nincs fent, azonnal bemondja, csendes órákban, némításkor és vendégmódban is – lehet, hogy olyan valaki az, akinek nem kéne ott lennie.",
+          "night_watch_speakers": "Üresen minden hangszóró.",
+          "warm_by_weekdays": "Opcionális: hétköznap mikorra legyen meleg. Üresen a tanult felkelési időt használja.",
+          "warm_by_weekends": "Opcionális: ugyanez szombatra és vasárnapra."
+        }
+      },
+      "memories": {
+        "title": "Emlékek",
+        "description": "A ház {count} dolgot jegyzett meg. Válassz egyet szerkesztésre, pipáld ki, amit elfelejtsen, vagy adj hozzá újat.",
+        "data": {
+          "edit": "Emlék szerkesztése",
+          "forget": "Elfelejtés",
+          "add": "Emlék hozzáadása",
+          "category": "Az új emlék kategóriája"
+        }
+      },
+      "edit_memory": {
+        "title": "Emlék szerkesztése",
+        "data": {
+          "text": "Emlék",
+          "category": "Kategória"
+        }
+      },
+      "briefing": {
+        "title": "Összefoglalók",
+        "description": "Mi kerüljön az összefoglalóba – az ÖSSZEFOGLALÓ gombbal, hanggal, vagy minden nap egy beállított időpontban.",
+        "data": {
+          "briefings": "Összefoglalók bekapcsolva",
+          "briefing_sections": "Tartalom",
+          "briefing_weather": "Időjárás forrása",
+          "briefing_todo": "Teendőlisták",
+          "briefing_calendars": "Naptárak",
+          "briefing_system": "Jelentett rendszerérzékelők",
+          "briefing_time": "Napi összefoglaló ekkor",
+          "digest_time": "Napi kivonat ekkor",
+          "morning_briefing": "Összefoglaló, amikor valaki először felkel"
+        },
+        "data_description": {
+          "briefings": "Kikapcsolva a gomb, a hangeszköz és a szolgáltatás is kikapcsol.",
+          "briefing_weather": "Üresen az első időjárás-entitást használja.",
+          "briefing_system": "pl. CPU-hőmérséklet, lemezhasználat, a NAS. A függő frissítéseket mindig beleszámolja.",
+          "briefing_time": "Opcionális. Csak akkor mondja be, ha valaki otthon van, és nincsenek csendes órák.",
+          "digest_time": "Opcionális: naponta egyszer az AI pár mondatban összefoglalja az idővonalat. Az idővonalra kerül (és telefonra, ha kéred). Nem mondja be.",
+          "morning_briefing": "Naponta egyszer, amikor a csendes órák után valaki először mozog (délig), abban a szobában."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "memories": {
+        "name": "Emlékek"
+      },
+      "last_spoken": {
+        "name": "Utoljára mondott"
+      },
+      "likely_room": {
+        "name": "Valószínű szoba"
+      },
+      "watches": {
+        "name": "Figyelések"
+      },
+      "routines": {
+        "name": "Rutinok"
+      },
+      "visitors": {
+        "name": "Látogatók"
+      },
+      "health": {
+        "name": "A ház állapota"
+      }
+    },
+    "switch": {
+      "hush": {
+        "name": "Némítás"
+      },
+      "guest_mode": {
+        "name": "Vendégmód"
+      },
+      "chime": {
+        "name": "Csengőhang"
+      }
+    }
+  },
+  "selector": {
+    "priority": {
+      "options": {
+        "low": "Alacsony",
+        "normal": "Normál",
+        "urgent": "Sürgős (a csendes órákat figyelmen kívül hagyja)"
+      }
+    },
+    "category": {
+      "options": {
+        "fact": "Tény",
+        "preference": "Preferencia",
+        "person": "Személy",
+        "routine": "Rutin",
+        "note": "Jegyzet"
+      }
+    },
+    "chattiness": {
+      "options": {
+        "off": "Ki",
+        "quiet": "Csendes",
+        "normal": "Normál",
+        "chatty": "Beszédes"
+      }
+    },
+    "briefing_section": {
+      "options": {
+        "time": "Idő",
+        "weather": "Időjárás",
+        "reminders": "Mai emlékeztetők",
+        "watches": "Mit figyel éppen",
+        "routines": "Közelgő rutinok",
+        "open": "Nyitott ablakok és ajtók",
+        "visitors": "Mai látogatók",
+        "said": "Mi hangzott el nemrég",
+        "system": "Rendszerállapot",
+        "todo": "Teendőlisták",
+        "calendar": "Naptár (következő 24 óra)",
+        "energy": "Mai áramfogyasztás (és ami szokatlan)",
+        "security": "Ami nyitva vagy bezáratlan"
+      }
+    },
+    "notify_when": {
+      "options": {
+        "urgent": "Sürgős bejelentések",
+        "held_quiet": "Csendes órák miatt visszatartott dolgok",
+        "unheard": "Amit senki nem hallhatott (nem volt elérhető hangszóró)",
+        "visitors": "Csengető látogatók és csomagok",
+        "watches": "Lejáró figyelések és emlékeztetők",
+        "health": "A ház állapotproblémái",
+        "digest": "A napi kivonat",
+        "critical": "Biztonsági riasztások (füst, CO, gáz, szivárgás)",
+        "security": "Nyitva maradt dolgok, amikor mindenki elmegy"
+      }
+    }
+  },
+  "services": {
+    "say": {
+      "name": "Mondd",
+      "description": "Beszéd a házban, a csendes órák és a szobafigyelés szerint.",
+      "fields": {
+        "message": {
+          "name": "Üzenet",
+          "description": "Mit mondjon."
+        },
+        "priority": {
+          "name": "Prioritás",
+          "description": "A sürgős figyelmen kívül hagyja a csendes órákat és a némítást; az alacsony sosem szakít félbe."
+        },
+        "speaker": {
+          "name": "Hangszóró",
+          "description": "Hangszóró, szobanév vagy entitásazonosító. Üresen követi az embert."
+        }
+      }
+    },
+    "remember": {
+      "name": "Megjegyzés",
+      "description": "Valami hozzáadása a ház hosszú távú memóriájához.",
+      "fields": {
+        "text": {
+          "name": "Szöveg",
+          "description": "Egy rövid mondat."
+        },
+        "category": {
+          "name": "Kategória",
+          "description": "Milyen fajta emlék ez."
+        }
+      }
+    },
+    "forget": {
+      "name": "Elfelejtés",
+      "description": "Emlék törlése azonosító vagy egyező szöveg alapján.",
+      "fields": {
+        "what": {
+          "name": "Mit",
+          "description": "Emlék-azonosító vagy szavak belőle."
+        }
+      }
+    },
+    "watch": {
+      "name": "Figyelés",
+      "description": "Egy eszköz, érzékelő vagy kamera figyelése, és szól, ha valami történik.",
+      "fields": {
+        "what": {
+          "name": "Mit",
+          "description": "Rövid leírás, pl. 'a macskák a nyúlketrec közelében'."
+        },
+        "entity": {
+          "name": "Entitás",
+          "description": "Entitásazonosító, név, vagy egy kamera területének neve."
+        },
+        "to_state": {
+          "name": "Erre az állapotra",
+          "description": "Akkor jelez, ha az entitás eléri ezt az állapotot."
+        },
+        "above": {
+          "name": "Fölött",
+          "description": "Akkor jelez, ha az érték e fölé megy."
+        },
+        "below": {
+          "name": "Alatt",
+          "description": "Akkor jelez, ha az érték e alá megy."
+        },
+        "question": {
+          "name": "Kérdés",
+          "description": "Kamerás figyelés: igen/nem kérdés a képről."
+        },
+        "look_for": {
+          "name": "Mit keressen",
+          "description": "Kamerás figyelés: erre a tárgyra ébredjen, pl. személy, macska, autó."
+        },
+        "message": {
+          "name": "Üzenet",
+          "description": "Mit mondjon. Üresen automatikus mondat."
+        },
+        "until": {
+          "name": "Meddig",
+          "description": "Időpont, pl. 18:00."
+        },
+        "minutes": {
+          "name": "Percek",
+          "description": "Vagy hány percig figyeljen."
+        },
+        "repeat": {
+          "name": "Ismétlés",
+          "description": "Jelzés után is figyeljen tovább."
+        },
+        "priority": {
+          "name": "Prioritás",
+          "description": "A sürgős figyelmen kívül hagyja a csendes órákat."
+        },
+        "speaker": {
+          "name": "Hangszóró",
+          "description": "Hol mondja. Üresen követi az embereket."
+        },
+        "wake_on": {
+          "name": "Ébredés erre",
+          "description": "Kamerás figyelés: zóna- vagy tárgyérzékelő, amire a kamera saját érzékelői helyett ébredjen."
+        },
+        "spot": {
+          "name": "Pont",
+          "description": "Kamerás figyelés: csak ezt a megnevezett pontot nézze (hanggal tanítva, pl. 'a nyúlketrec')."
+        }
+      }
+    },
+    "cancel_watch": {
+      "name": "Figyelés leállítása",
+      "description": "Egy figyelés leállítása.",
+      "fields": {
+        "what": {
+          "name": "Mit",
+          "description": "Figyelés-azonosító vagy szavak belőle."
+        }
+      }
+    },
+    "remind": {
+      "name": "Emlékeztetés",
+      "description": "Valami bemondása egy adott időpontban, abban a szobában, ahol emberek vannak.",
+      "fields": {
+        "message": {
+          "name": "Üzenet",
+          "description": "Mit mondjon, pl. 'Ideje bekapcsolni a sütőt.'"
+        },
+        "at": {
+          "name": "Időpont",
+          "description": "Időpont, pl. 18:00."
+        },
+        "minutes": {
+          "name": "Percek",
+          "description": "Vagy hány perc múlva."
+        },
+        "speaker": {
+          "name": "Hangszóró",
+          "description": "Hol mondja. Üresen követi az embereket."
+        },
+        "priority": {
+          "name": "Prioritás",
+          "description": "A sürgős (alapértelmezett) csendes órákban is szól."
+        }
+      }
+    },
+    "ask": {
+      "name": "Kérdezés",
+      "description": "Hangos kérdés és a válasz meghallgatása abban a szobában, ahol emberek vannak.",
+      "fields": {
+        "question": {
+          "name": "Kérdés",
+          "description": "pl. 'Kérsz egy kávét? Bekapcsoljam a kávéfőzőt?'"
+        },
+        "priority": {
+          "name": "Prioritás",
+          "description": "A sürgős figyelmen kívül hagyja a csendes órákat és a némítást."
+        },
+        "speaker": {
+          "name": "Hangszóró",
+          "description": "Hol kérdezzen. Üresen követi az embereket."
+        },
+        "extra_prompt": {
+          "name": "További utasítások",
+          "description": "További útmutatás a választ kezelő hangagentnek."
+        },
+        "preannounce": {
+          "name": "Előbb csengőhang",
+          "description": "Csengőhang lejátszása a kérdés előtt."
+        }
+      }
+    },
+    "learn": {
+      "name": "Tanulás most",
+      "description": "Rutinok keresése a közelmúlt előzményeiben azonnal, az éjszaka megvárása helyett."
+    },
+    "briefing": {
+      "name": "Összefoglaló",
+      "description": "Rövid összefoglaló arról, ami most fontos, ott bemondva, ahol emberek vannak.",
+      "fields": {
+        "speak": {
+          "name": "Bemondás",
+          "description": "Kikapcsolva csak a tényeket adja vissza, bemondás és AI nélkül."
+        },
+        "priority": {
+          "name": "Prioritás",
+          "description": "A sürgős csendes órákban is szól, pl. ha valaki gombbal kérte."
+        }
+      }
+    },
+    "tidy_memories": {
+      "name": "Emlékek rendezése",
+      "description": "Ismétlődések összevonása és értelmetlen emlékek törlése most (minden vasárnap éjjel magától is lefut)."
+    },
+    "forget_routine": {
+      "name": "Tanult rutin törlése",
+      "description": "Tanult rutin vagy szokás végleges törlése – a ház abbahagyja, és soha többé nem tanulja meg vagy ajánlja fel. Visszaállítással a törölteket hozza vissza (egyet, vagy mindet, ha a Rutin üres).",
+      "fields": {
+        "routine": {
+          "name": "Rutin",
+          "description": "Rutin-azonosító vagy szavak belőle."
+        },
+        "restore": {
+          "name": "Visszaállítás",
+          "description": "Inkább a töröltek visszahozása."
+        }
+      }
+    },
+    "adopt_routine": {
+      "name": "Rutin átvétele",
+      "description": "A ház magától csinálja a tanult rutint, vagy hagyja abba. Az Átvétel üresen hagyva vált.",
+      "fields": {
+        "routine": {
+          "name": "Rutin",
+          "description": "Rutin-azonosító vagy szavak belőle."
+        },
+        "adopt": {
+          "name": "Átvétel",
+          "description": "Be: indítás, ki: leállítás."
+        }
+      }
+    },
+    "hush": {
+      "name": "Némítás",
+      "description": "Egy ideig csak a sürgős dolgokat mondja. 0 perc megszünteti a némítást.",
+      "fields": {
+        "minutes": {
+          "name": "Percek",
+          "description": "Meddig maradjon némítva."
+        }
+      }
+    },
+    "run_routine": {
+      "name": "Rutin futtatása",
+      "description": "Egy elnevezett rutin futtatása (az oldalsáv oldal Beállítások → Rutinok részén állítható be).",
+      "fields": {
+        "name": {
+          "name": "Név",
+          "description": "A rutin neve vagy egyik másik neve."
+        },
+        "speak": {
+          "name": "Bemondás",
+          "description": "Az eredmény bemondása ott, ahol emberek vannak."
+        }
+      }
+    },
+    "weekly_report": {
+      "name": "Heti jelentés",
+      "description": "Összeállítja, mit tanult és vett észre a ház az elmúlt héten, és az idővonalon tartja."
+    }
+  }
+}

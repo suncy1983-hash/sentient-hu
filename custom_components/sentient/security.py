@@ -11,6 +11,9 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
+from . import i18n
+from .i18n import t
+
 OPEN_CLASSES = {"door", "window", "garage_door", "opening"}
 
 
@@ -48,22 +51,32 @@ def check(hass: HomeAssistant, ignore: set[str] | None = None) -> dict[str, Any]
 
 
 def _join(names: list[str]) -> str:
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+    return i18n.join(names)
 
 
 def summary(open_items: list[dict], unlocked: list[dict], alarms: list[dict]) -> str:
     parts = []
     if open_items:
         names = [i["name"] for i in open_items]
-        parts.append(f"{_join(names)} {'is' if len(names) == 1 else 'are'} open")
+        parts.append(t("security.open_one" if len(names) == 1 else "security.open_many", names=_join(names)))
     if unlocked:
         names = [i["name"] for i in unlocked]
-        parts.append(f"{_join(names)} {'is' if len(names) == 1 else 'are'} unlocked")
+        parts.append(t("security.unlocked_one" if len(names) == 1 else "security.unlocked_many", names=_join(names)))
     if not parts:
-        text = "Everything's shut" + (" and locked" if not unlocked and alarms is not None else "") + "."
+        text = t("security.all_shut") + (t("security.and_locked") if not unlocked and alarms is not None else "") + "."
     else:
         text = "; ".join(p[0].upper() + p[1:] for p in parts) + "."
     armed = [a for a in alarms if a["state"].startswith("armed")]
     if alarms:
-        text += " The alarm is " + ("set (" + armed[0]["state"].replace("armed_", "").replace("_", " ") + ")." if armed else "off.")
+        if armed:
+            mode = armed[0]["state"].replace("armed_", "").replace("_", " ")
+            text += t("security.alarm_set", mode=_ALARM_MODES_HU.get(mode, mode) if i18n.is_hu() else mode)
+        else:
+            text += t("security.alarm_off")
     return text
+
+
+_ALARM_MODES_HU = {
+    "home": "otthon", "away": "távol", "night": "éjszakai", "vacation": "szabadság",
+    "custom bypass": "egyéni", "armed": "élesítve",
+}

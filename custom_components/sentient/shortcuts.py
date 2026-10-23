@@ -19,7 +19,9 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.script import Script, async_validate_actions_config
 from homeassistant.helpers.storage import Store
 
+from . import i18n
 from .const import DOMAIN
+from .i18n import t
 
 _LOGGER = logging.getLogger(__name__)
 STORAGE_VERSION = 1
@@ -115,19 +117,22 @@ class Shortcuts:
                 if st.state == "on" and st.attributes.get("device_class") in OPEN_CLASSES
             ]
             if open_now:
-                notes.append(_join(open_now) + (" is" if len(open_now) == 1 else " are") + " still open")
+                notes.append(t("routine.still_open_one" if len(open_now) == 1 else "routine.still_open_many",
+                               names=_join(open_now)))
         if item.check_locks:
             from .security import check
 
             unlocked = check(self.hass)["unlocked"]
             if unlocked:
                 names = [u["name"] for u in unlocked]
-                notes.append(_join(names) + (" is" if len(names) == 1 else " are") + " unlocked")
+                notes.append(t("routine.unlocked_one" if len(names) == 1 else "routine.unlocked_many",
+                               names=_join(names)))
         if item.check_lights:
             lit = [st.name for st in self.hass.states.async_all("light") if st.state == "on"]
             if lit:
-                shown = lit[:4] + ([f"{len(lit) - 4} more"] if len(lit) > 4 else [])
-                notes.append(_join(shown) + (" is" if len(lit) == 1 else " are") + " still on")
+                shown = lit[:4] + ([t("routine.more", n=len(lit) - 4)] if len(lit) > 4 else [])
+                notes.append(t("routine.still_on_one" if len(lit) == 1 else "routine.still_on_many",
+                               names=_join(shown)))
         return notes
 
     async def async_run(self, name: str, context: Context | None = None) -> dict[str, Any]:
@@ -153,4 +158,4 @@ class Shortcuts:
 
 
 def _join(names: list[str]) -> str:
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+    return i18n.join(names)

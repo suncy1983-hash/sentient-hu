@@ -17,18 +17,13 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers.event import async_call_later
 
 from .const import CONF_CRITICAL, CONF_CRITICAL_EXTRA, CONF_CRITICAL_IGNORE
+from . import i18n
+from .i18n import t
 from .presence import area_of
 
 _LOGGER = logging.getLogger(__name__)
 
-WORDS = {
-    "smoke": "Smoke detected",
-    "carbon_monoxide": "Carbon monoxide detected",
-    "gas": "Gas detected",
-    "moisture": "Water leak detected",
-    "safety": "Safety alarm",
-    "tamper": "Tamper alarm",
-}
+WORDS = ("smoke", "carbon_monoxide", "gas", "moisture", "safety", "tamper")
 
 
 def is_active(st) -> bool:
@@ -77,14 +72,15 @@ class CriticalAlerts:
     def message(self, entity_id: str) -> str:
         st = self.hass.states.get(entity_id)
         if st is not None and st.domain == "alarm_control_panel":
-            return f"The {st.name.lower() if st.name else 'alarm'} has gone off!"
+            return t("critical.panel", name=st.name or ("riasztó" if i18n.is_hu() else "alarm"))
         if st is not None and st.attributes.get("device_class") not in WORDS:
-            return f"Alert: {st.name}!"
-        base = WORDS.get(st.attributes.get("device_class") if st else "", "Alarm")
+            return t("critical.named", name=st.name)
+        device_class = st.attributes.get("device_class") if st else None
+        base = t(f"critical.{device_class}") if device_class in WORDS else t("critical.default")
         area = area_of(self.hass, entity_id)
         area_entry = ar.async_get(self.hass).async_get_area(area) if area else None
         where = area_entry.name if area_entry else (st.name if st else entity_id)
-        return f"{base} in the {where.lower()}!" if area_entry else f"{base}: {where}!"
+        return t("critical.in_area" if area_entry else "critical.at", base=base, where=where)
 
     @callback
     def _changed(self, event: Event) -> None:
@@ -97,7 +93,7 @@ class CriticalAlerts:
                 unsub()
             if is_active(old):
                 st = self.hass.states.get(entity_id)
-                self._rt().timeline.add("critical", f"{st.name if st else entity_id} has cleared")
+                self._rt().timeline.add("critical", t("critical.cleared", name=st.name if st else entity_id))
             return
         if old is None or is_active(old) or old.state in ("unavailable", "unknown"):
             return  # not a fresh alarm (or just a sensor coming back)
@@ -125,8 +121,8 @@ class CriticalAlerts:
     async def async_test(self) -> dict[str, Any]:
         """Say a test alert on every speaker (from the Settings page)."""
         rt = self._rt()
-        await self._say(rt, "This is a test of the safety alert. Nothing is wrong.")
-        rt.timeline.add("critical", "Safety alert tested", "from the settings page")
+        await self._say(rt, t("critical.test"))
+        rt.timeline.add("critical", t("critical.tested"), t("critical.tested_from"))
         return {"tested": True}
 
     async def _say(self, rt, text: str) -> None:

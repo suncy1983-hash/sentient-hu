@@ -14,6 +14,8 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
+from .i18n import t
+
 _LOGGER = logging.getLogger(__name__)
 DAYS = 7
 UNUSUAL = 2.0  # at least this many times the usual
@@ -110,7 +112,7 @@ def describe(report: dict[str, Any]) -> list[str]:
     lines = []
     for i in report.get("unusual", [])[:3]:
         if i.get("times_usual"):
-            lines.append(f"{i['name']} has used {i['kwh']} kWh today, about {i['times_usual']}× its usual")
+            lines.append(t("energy.used_times", name=i["name"], kwh=i["kwh"], times=i["times_usual"]))
         else:
-            lines.append(f"{i['name']} has used {i['kwh']} kWh today, when it's normally next to nothing")
+            lines.append(t("energy.used_unusual", name=i["name"], kwh=i["kwh"]))
     return lines

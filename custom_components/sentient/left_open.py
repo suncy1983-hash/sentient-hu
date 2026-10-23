@@ -19,6 +19,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_LEAVING_CHECK, CONF_LEFT_OPEN_IGNORE, CONF_LEFT_OPEN_MINUTES
+from .i18n import t
 from .security import OPEN_CLASSES, check
 
 _LOGGER = logging.getLogger(__name__)
@@ -68,8 +69,11 @@ class LeftOpen:
                 continue
             self._told[st.entity_id] = utcnow
             mins = int(open_for.total_seconds() // 60)
-            span = f"{mins // 60} hour{'s' if mins >= 120 else ''}" if mins >= 60 else f"{mins} minutes"
-            text = f"{st.name} has been open for {span}."
+            if mins >= 60:
+                span = t("left_open.hours" if mins >= 120 else "left_open.hour", n=mins // 60)
+            else:
+                span = t("left_open.minutes", n=mins)
+            text = t("left_open.open_for", name=st.name, span=span)
             self.hass.async_create_task(self._rt().speech.async_say(text, "normal", source="left_open"))
         self._told = {k: v for k, v in self._told.items() if k in still_open}
 
@@ -85,4 +89,4 @@ class LeftOpen:
         report = check(self.hass)
         if report["secure"]:
             return
-        self._rt().timeline.add("security", report["summary"], "when the last person left")
+        self._rt().timeline.add("security", report["summary"], t("left_open.last_left"))

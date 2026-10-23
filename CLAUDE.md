@@ -15,7 +15,7 @@ Home Assistant custom integration (domain `sentient`). An evolving AI "brain" sh
 - `docs/ROADMAP.md` — stages; tick items off as they land
 
 ## Conventions
-- British English in user-facing strings.
-- Keep `strings.json` and `translations/en.json` identical.
+- Sentences Sentient writes itself go through `i18n.t()` with an English (British) and a Hungarian version; the house language comes from Home Assistant. AI prompts end with `i18n.write_in()`. Never hard-code a spoken sentence.
+- Keep `strings.json` and `translations/en.json` identical, and `translations/hu.json` with exactly the same keys (a test checks).
 - Bump `manifest.json` version for every release; HACS uses GitHub releases/tags.
 - Releases: bumping `version` in manifest.json and pushing to main is enough — `.github/workflows/release.yml` creates the `v<version>` tag and GitHub release that HACS reads.

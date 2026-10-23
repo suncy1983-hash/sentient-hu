@@ -408,6 +408,7 @@ async def ws_forget_spot(hass: HomeAssistant, connection, msg: dict[str, Any]) -
         vol.Optional("spot"): str,
     }
 )
+@websocket_api.require_admin  # a camera picture through the AI: costs, and shows what's on camera
 @websocket_api.async_response
 async def ws_look(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
     """Ask the AI about a camera (or one spot of it) right now."""
@@ -500,6 +501,7 @@ def ws_timeline(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
 
 
 @websocket_api.websocket_command({vol.Required("type"): "sentient/digest", vol.Optional("hours", default=24): vol.Coerce(float)})
+@websocket_api.require_admin  # an AI call
 @websocket_api.async_response
 async def ws_digest(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
     entry = _entry(hass)
@@ -523,6 +525,10 @@ def ws_mutes(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
     entry = _entry(hass)
     if entry is None:
         connection.send_error(msg["id"], "not_loaded", "Sentient is not set up")
+        return
+    changes = any(msg.get(k) for k in ("clear", "remove", "unlearn_all", "unlearn"))
+    if changes and not connection.user.is_admin:
+        connection.send_error(msg["id"], websocket_api.ERR_UNAUTHORIZED, "Only an administrator can change this")
         return
     mutes = entry.runtime_data.mutes
     if msg.get("clear"):

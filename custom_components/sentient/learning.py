@@ -33,6 +33,8 @@ from homeassistant.helpers.sun import get_astral_event_date
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from . import i18n
+from .i18n import t as _t
 from .const import (
     CONF_LEARN_ENTITIES,
     CONF_LINK_TRIGGERS,
@@ -113,12 +115,16 @@ class Routine:
     @property
     def when(self) -> str:
         hour, minute = divmod(self.minute, 60)
-        h12 = hour % 12 or 12
-        return f"{h12}{'' if minute == 0 else f':{minute:02d}'}{'am' if hour < 12 else 'pm'}"
+        return i18n.clock(hour, minute)
 
     def describe(self) -> str:
-        verb = {"on": "goes on", "off": "goes off", "open": "opens", "closed": "closes"}.get(self.state, self.state)
-        return f"The {self.name} usually {verb} around {self.when} {self.days}."
+        return _t(
+            "learning.routine",
+            name=self.name,
+            verb=i18n.state_verb(self.state),
+            when=self.when,
+            days=_t(f"learning.{self.days}"),
+        )
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -127,7 +133,7 @@ class Routine:
         return {
             "id": self.id,
             "routine": self.describe(),
-            "how_sure": f"{round(self.support * 100)}% of days",
+            "how_sure": _t("learning.how_sure_days", pct=round(self.support * 100)),
             "adopted": self.adopted,
         }
 
@@ -200,14 +206,7 @@ def find_routines(
 
 
 def _verb(entity_id: str, state: str, device_class: str | None = None) -> str:
-    domain = entity_id.split(".", 1)[0]
-    if domain == "binary_sensor":
-        if device_class in OPEN_CLASSES or device_class is None:
-            return "opens" if state == "on" else "closes"
-        return "turns on" if state == "on" else "turns off"
-    if domain == "media_player":
-        return "starts playing" if state == "playing" else "is turned off"
-    return {"on": "goes on", "off": "goes off", "open": "opens", "closed": "closes"}.get(state, f"changes to {state}")
+    return i18n.change_verb(entity_id.split(".", 1)[0], state, device_class, OPEN_CLASSES)
 
 
 @dataclass
@@ -237,11 +236,19 @@ class Link:
             self.id = hashlib.sha1(key.encode()).hexdigest()[:6]
 
     def describe(self) -> str:
-        soon = "straight after" if self.lag <= 20 else "within a minute" if self.lag <= 60 else "within a couple of minutes"
-        return (
-            f"When the {self.cause_name} {_verb(self.cause, self.cause_state, self.cause_class)}"
-            f"{' after dark' if self.dark else ''}, the {self.name} usually "
-            f"{_verb(self.entity_id, self.state)} {soon}."
+        soon = _t(
+            "learning.straight_after" if self.lag <= 20
+            else "learning.within_minute" if self.lag <= 60
+            else "learning.within_minutes"
+        )
+        return _t(
+            "learning.link",
+            cause=self.cause_name,
+            cause_verb=_verb(self.cause, self.cause_state, self.cause_class),
+            dark=_t("learning.after_dark") if self.dark else "",
+            name=self.name,
+            verb=_verb(self.entity_id, self.state),
+            soon=soon,
         )
 
     def as_dict(self) -> dict[str, Any]:
@@ -251,7 +258,7 @@ class Link:
         return {
             "id": self.id,
             "routine": self.describe(),
-            "how_sure": f"{round(self.support * 100)}% of the time ({self.seen} times)",
+            "how_sure": _t("learning.how_sure_times", pct=round(self.support * 100), seen=self.seen),
             "adopted": self.adopted,
             "kind": "link",
         }
@@ -652,15 +659,11 @@ class Learner:
             return
         if self.tracker is not None and self.tracker.best_area() is None:
             return  # nobody obviously about; try again later
-        if isinstance(routine, Link):
-            said = routine.describe()
-            question = f"I've noticed that {said[0].lower()}{said[1:-1]}. Want me to do that for you from now on?"
-        else:
-            question = (
-                f"I've noticed the {routine.name} usually "
-                f"{'goes ' + routine.state if routine.state in ('on', 'off') else ('opens' if routine.state == 'open' else 'closes')}"
-                f" around {routine.when} {routine.days}. Want me to do that for you from now on?"
-            )
+        said = routine.describe()
+        question = _t(
+            "learning.offer_link" if isinstance(routine, Link) else "learning.offer",
+            said=f"{said[0].lower()}{said[1:-1]}",
+        )
         result = await self.speech.async_ask(
             question,
             source="learning",

@@ -10,6 +10,16 @@ It works with the AI you already have in Home Assistant (Google Gemini, OpenAI, 
 
 > **Status: beta.** In daily use in one house; feedback and issues very welcome. Needs Home Assistant 2025.10 or newer, a conversation agent (Google Gemini, OpenAI, Ollama…) and, for camera and background features, an AI Task entity.
 
+## This fork: Hungarian
+
+This is a fork of [conahmorgan2304/sentient](https://github.com/conahmorgan2304/sentient) for a Hungarian house. It follows Home Assistant's language (Settings → System → General → Language); with English everything behaves exactly as upstream.
+
+- **Speaks Hungarian.** Everything Sentient says by itself — safety alerts, doors left open, night watch, the doorbell and parcels, "welcome back", routine offers, routine checks, reminders and watch messages, phone notification titles — comes from `i18n.py`, with names put first and the right article ("Az előszoba lámpa hétköznap általában 17:30 körül bekapcsol."). Every AI prompt (briefing, digest, noticing, camera looks, welcome) ends with "Always write in Hungarian", and voice assistants are told to answer in Hungarian.
+- **Hungarian settings.** `translations/hu.json` covers the setup, the options, the sidebar page's Settings tab, entity names and services.
+- **Memory search that understands Hungarian.** Accent-blind, any alphabet, Hungarian stop words, and word forms matched by stem: "hol vannak a nyulak?" finds "A nyúlketrec a fészer mellett van", "kut" finds "kút". Cancelling a watch by voice uses the same matching.
+- **Calendar events by voice.** A new `sentient_add_calendar_event` tool puts events into any calendar that accepts them (local, Google, CalDAV…); with more than one, it asks which.
+- **Tighter sidebar permissions.** Camera looks and the AI digest are admin-only, and so is changing shushes and learned feedback; everyone in the house can still read the page.
+
 ## What it does today
 
 - **Shared long-term memory.** "Remember the rabbits' hutch is by the shed." Any voice in the house can then recall it. Near-duplicates are merged rather than piling up.

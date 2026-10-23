@@ -18,6 +18,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
+from .i18n import t
 from .const import (
     CONF_BATTERY_THRESHOLD,
     CONF_HEALTH_IGNORE,
@@ -156,9 +157,9 @@ class HouseHealth:
         out = []
         for i in self.issues:
             if i["kind"] == "offline":
-                out.append(f"{i['name']} is offline")
+                out.append(t("health.offline", name=i["name"]))
             elif i["level"] is not None:
-                out.append(f"{i['name']} is at {i['level']}%")
+                out.append(t("health.battery", name=i["name"], level=i["level"]))
             else:
-                out.append(f"{i['name']} is low")
+                out.append(t("health.low", name=i["name"]))
         return out

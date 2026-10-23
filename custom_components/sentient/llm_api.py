@@ -33,6 +33,9 @@ from .const import (
     PRIORITIES,
 )
 
+from . import i18n
+from .i18n import t
+
 if TYPE_CHECKING:
     from . import SentientRuntime
 
@@ -232,6 +235,123 @@ class RemindTool(_Tool):
         except HomeAssistantError as err:
             return {"error": str(err)}
         return {"reminder": reminder.summary()}
+
+
+def _writable_calendars(hass: HomeAssistant) -> list[Any]:
+    """Calendars that can take new events (local calendars, Google, CalDAV...)."""
+    from homeassistant.components.calendar import CalendarEntityFeature
+
+    return [
+        st for st in hass.states.async_all("calendar")
+        if int(st.attributes.get("supported_features") or 0) & CalendarEntityFeature.CREATE_EVENT
+    ]
+
+
+def _parse_when(value: str) -> tuple[Any, bool]:
+    """'2026-10-24 18:00' / '2026-10-24T18:00:00+02:00' → local datetime; '2026-10-24' → date (all day)."""
+    text = (value or "").strip()
+    if len(text) == 10:  # a plain date: all day
+        if (day := dt_util.parse_date(text)) is not None:
+            return day, True
+        raise ValueError(value)
+    if len(text) > 10 and text[10] == " ":
+        text = text[:10] + "T" + text[11:]
+    when = dt_util.parse_datetime(text)
+    if when is None:
+        raise ValueError(value)
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=dt_util.get_default_time_zone())
+    return dt_util.as_local(when), False
+
+
+class CalendarEventTool(_Tool):
+    name = "sentient_add_calendar_event"
+    description = (
+        "Put an event in one of the household's calendars, e.g. 'put the dentist on Tuesday at 3' or "
+        "'add the school play on 12 March'. 'start' (and optional 'end') are local times as "
+        "'YYYY-MM-DD HH:MM', or just 'YYYY-MM-DD' for an all-day event; work them out from today's "
+        "date. Without an end it lasts an hour. Leave 'calendar' empty unless they name one; if there "
+        "is more than one calendar you get the list back — ask which. Confirm with what's returned."
+    )
+    parameters = vol.Schema(
+        {
+            vol.Required("summary"): cv.string,
+            vol.Required("start"): cv.string,
+            vol.Optional("end"): cv.string,
+            vol.Optional("calendar"): cv.string,
+            vol.Optional("description"): cv.string,
+            vol.Optional("location"): cv.string,
+        }
+    )
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        from datetime import timedelta
+
+        args = tool_input.tool_args
+        calendars = _writable_calendars(hass)
+        if not calendars:
+            return {"error": t("calendar.none")}
+        wanted = (args.get("calendar") or "").strip()
+        if wanted:
+            key = wanted.lower()
+            target = next(
+                (c for c in calendars if c.entity_id == wanted or (c.name or "").lower() == key), None
+            ) or next((c for c in calendars if key in (c.name or "").lower() or key in c.entity_id), None)
+            if target is None:
+                return {"error": t("calendar.not_found", name=wanted),
+                        "calendars": [c.name for c in calendars]}
+        elif len(calendars) == 1:
+            target = calendars[0]
+        else:
+            return {"which_calendar": [c.name for c in calendars]}
+
+        try:
+            start, all_day = _parse_when(args["start"])
+        except ValueError:
+            return {"error": t("calendar.bad_time", value=args["start"])}
+        data: dict[str, Any] = {"entity_id": target.entity_id, "summary": args["summary"]}
+        if args.get("description"):
+            data["description"] = args["description"]
+        if args.get("location"):
+            data["location"] = args["location"]
+        if all_day:
+            end = start + timedelta(days=1)  # the end date is exclusive
+            if args.get("end"):
+                try:
+                    last, last_all_day = _parse_when(args["end"])
+                except ValueError:
+                    return {"error": t("calendar.bad_time", value=args["end"])}
+                end = (last if last_all_day else last.date()) + timedelta(days=1)
+                if end <= start:
+                    return {"error": t("calendar.end_before_start")}
+            data["start_date"], data["end_date"] = start.isoformat(), end.isoformat()
+        else:
+            end = start + timedelta(hours=1)
+            if args.get("end"):
+                try:
+                    end, end_all_day = _parse_when(args["end"])
+                except ValueError:
+                    return {"error": t("calendar.bad_time", value=args["end"])}
+                if end_all_day:
+                    return {"error": t("calendar.bad_time", value=args["end"])}
+            if end <= start:
+                return {"error": t("calendar.end_before_start")}
+            data["start_date_time"] = start.isoformat()
+            data["end_date_time"] = end.isoformat()
+        try:
+            await hass.services.async_call("calendar", "create_event", data, blocking=True,
+                                           context=llm_context.context)
+        except HomeAssistantError as err:
+            return {"error": str(err)}
+        return {
+            "added": args["summary"],
+            "calendar": target.name,
+            "start": data.get("start_date_time") or data["start_date"],
+            "end": data.get("end_date_time") or data["end_date"],
+            "all_day": all_day,
+        }
 
 
 class ListWatchesTool(_Tool):
@@ -720,7 +840,7 @@ class SentientAPI(llm.API):
             llm_context=llm_context,
             tools=[RememberTool(), RecallTool(), ForgetTool(), AnnounceTool(),
                    WatchTool(), RemindTool(), ListWatchesTool(), CancelWatchTool(), LookTool(),
-                   RoutinesTool(), AdoptRoutineTool(), ForgetRoutineTool(), HeatingTool(), NightWatchTool(), WeeklyTool(), BriefingTool(), VisitorsTool(), SpotTool(), MotionLightsTool(), TimelineTool(), QuietTool(), ShushTool(), RunRoutineTool(), EnergyTool(), SecurityTool(), ScenesTool()],
+                   RoutinesTool(), AdoptRoutineTool(), ForgetRoutineTool(), HeatingTool(), NightWatchTool(), WeeklyTool(), BriefingTool(), VisitorsTool(), SpotTool(), MotionLightsTool(), TimelineTool(), QuietTool(), ShushTool(), RunRoutineTool(), EnergyTool(), SecurityTool(), ScenesTool(), CalendarEventTool()],
         )
 
     def _prompt(self, llm_context: llm.LLMContext) -> str:
@@ -778,9 +898,11 @@ class SentientAPI(llm.API):
             )
         lines.append(
             "When someone asks you to keep an eye on something, or to tell them when something "
-            "happens, use sentient_watch; to be reminded at a time, use sentient_remind. Never just "
-            "promise to remember."
+            "happens, use sentient_watch; to be reminded at a time, use sentient_remind; to put "
+            "something in the calendar, use sentient_add_calendar_event. Never just promise to remember."
         )
+        if i18n.lang() != "en":
+            lines.append(f"Always speak and answer in {i18n.language_name()}.")
         lines.append(
             "When someone tells you something worth knowing later, or asks you to "
             "remember it, save it with sentient_remember. Never use the words "
