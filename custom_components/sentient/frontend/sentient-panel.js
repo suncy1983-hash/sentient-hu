@@ -1201,5 +1201,269 @@ select{background:#0d1626;border:1px solid rgba(0,255,247,.3);border-radius:8px;
   .set{grid-template-columns:1fr} .side{position:static;flex-direction:row;overflow-x:auto} .sh{display:none} .nav span{display:none} .tabs span{display:none} }
 `;
 
+  // ---------- Hungarian (hu fork) ----------
+  // When Home Assistant's language is Hungarian, the page's own English labels are swapped for Hungarian as
+  // they are drawn, without touching the drawing code above. Exact labels come from HU_WORDS (upper-case
+  // variants are derived); labels with numbers or names in them from HU_RULES; "A · B" labels are translated
+  // part by part. Anything else — memories, names, what was said — is left exactly as it is.
+  const HU_WORDS = {
+    // top bar and overview
+    "OVERVIEW": "ÁTTEKINTÉS", "TIMELINE": "IDŐVONAL", "SETTINGS": "BEÁLLÍTÁSOK", "Ask anything…": "Kérdezz bármit…",
+    "BRIEFING": "ÖSSZEFOGLALÓ", "PREPARING": "KÉSZÜL", "SENTIENT IS STARTING — OR ISN'T SET UP YET": "A SENTIENT INDUL – VAGY MÉG NINCS BEÁLLÍTVA",
+    "QUIET HOURS": "CSENDES ÓRÁK", "AWAKE": "ÉBREN", "HUSH 1 HOUR": "NÉMÍTÁS 1 ÓRÁRA", "HUSHED": "NÉMÍTVA",
+    "GUEST MODE": "VENDÉGMÓD", "GUESTS IN": "VENDÉGEK VANNAK", "CHIME ON": "CSENGŐHANG BE", "CHIME OFF": "CSENGŐHANG KI",
+    "MEMORIES ›": "EMLÉKEK ›", "WATCHING": "FIGYEL", "ROUTINES": "RUTINOK", "VISITORS TODAY": "MAI LÁTOGATÓK", "PROBLEMS": "HIBÁK",
+    "WHERE PEOPLE ARE": "HOL VANNAK AZ EMBEREK", "NO RECENT MOTION": "NINCS FRISS MOZGÁS",
+    "BRING BACK": "VISSZAHOZÁS", "ROUTINES & HABITS": "RUTINOK ÉS SZOKÁSOK", "HOUSE DOES IT": "A HÁZ CSINÁLJA",
+    "DECLINED": "ELUTASÍTVA", "OFFERED": "FELAJÁNLVA", "LEARNED": "TANULT", "Delete": "Törlés",
+    "TAP TO STOP": "KOPPINTS A LEÁLLÍTÁSHOZ", "TAP TO LET THE HOUSE DO IT": "KOPPINTS, ÉS A HÁZ CSINÁLJA",
+    "NO ROUTINES LEARNED YET — CHECKED NIGHTLY": "MÉG NINCS TANULT RUTIN – ÉJJELENTE ELLENŐRZI",
+    "WATCHES & REMINDERS": "FIGYELÉSEK ÉS EMLÉKEZTETŐK", "LIVE": "ÉLŐ", "Cancel": "Mégse",
+    "NOTHING BEING WATCHED": "NINCS FIGYELT DOLOG", "SAY “KEEP AN EYE ON…”": "MONDD: „FIGYELD…”",
+    "Remind…, e.g. take the bins out": "Emlékeztető…, pl. vidd ki a kukát", "SET": "BEÁLLÍT",
+    "OFFLINE": "NEM ELÉRHETŐ", "LOW": "ALACSONY", "HOUSE HEALTH": "A HÁZ ÁLLAPOTA", "ALL GOOD": "MINDEN RENDBEN",
+    "EVERYTHING ONLINE": "MINDEN ELÉRHETŐ", "BATTERIES FINE": "AZ AKKUMULÁTOROK RENDBEN",
+    "VISITORS": "LÁTOGATÓK", "PARCEL LEFT": "CSOMAGOT HAGYTAK", "NO ONE AT THE DOOR YET": "MÉG SENKI NEM JÁRT AZ AJTÓNÁL",
+    "HUSHED BY": "AUTOMATIZÁCIÓ UTÁN", "DUPLICATE": "ISMÉTLÉS", "NO SPEAKER": "NINCS HANGSZÓRÓ", "BUSY": "FOGLALT",
+    "EMPTY": "ÜRES", "MUTED": "ELHALLGATTATVA", "SPOKE": "SZÓLT", "STAYED QUIET": "CSENDBEN MARADT",
+    "HELD: SAID SOMETHING HAD FINISHED, BUT IT HAD ONLY JUST STARTED": "VISSZATARTVA: KÉSZNEK MONDTA, PEDIG CSAK MOST INDULT",
+    "SKIPPED: DAILY AI LIMIT REACHED": "KIHAGYVA: ELÉRTE A NAPI AI-KORLÁTOT",
+    "SAID & NOTICED": "ELHANGZOTT ÉS ÉSZREVETT", "QUIET SO FAR": "EDDIG CSEND",
+    // settings side bar and groups (the groups' own titles come from the integration in English)
+    "Only an administrator can change settings.": "A beállításokat csak adminisztrátor módosíthatja.",
+    "Memories": "Emlékek", "Camera spots": "Kamerapontok", "Named areas the AI zooms into": "Megnevezett képrészek, amikre az AI ráközelít",
+    "Routines": "Rutinok", "goodnight, morning…": "jó éjt, reggel…", "Goodnight, good morning…": "Jó éjt, jó reggelt…",
+    "Shushed": "Elhallgattatva", "Things it won't mention": "Amiket nem említ", "Motion lights": "Mozgásos lámpák",
+    "after dark": "sötétedés után", "Lights that follow movement": "Mozgást követő lámpák",
+    "Backup": "Mentés", "Download or restore everything": "Minden letöltése vagy visszaállítása",
+    "Voice": "Hang", "Name, speakers and how it talks.": "Név, hangszórók és beszédmód.",
+    "Quiet & rooms": "Csend és szobák", "When to keep it down and how rooms are worked out.": "Mikor legyen halk, és hogyan dönti el, melyik szobában szóljon.",
+    "Briefings": "Összefoglalók", "What a briefing covers and when.": "Mi kerüljön az összefoglalóba, és mikor.",
+    "Noticing & learning": "Figyelés és tanulás", "What it watches for and learns from.": "Mire figyel, és miből tanul.",
+    "Night watch": "Éjszakai őrség", "Doors and gates opening at times they never normally do, with nobody up.": "Szokatlan időben nyíló ajtók és kapuk, amikor senki sincs fent.",
+    "Heating": "Fűtés", "What it learns about the heating, and warming up before people are up.": "Mit tanul a fűtésről, és felfűtés, mire felkeltek.",
+    "Door & cameras": "Ajtó és kamerák", "Doorbell log, parcels, faces and camera checks.": "Csengőnapló, csomagok, arcok és kamerás ellenőrzések.",
+    "Phone notifications": "Telefonos értesítések", "What also goes to people's phones.": "Mi menjen a telefonokra is.",
+    "Safety & security": "Biztonság", "Smoke, CO, gas and leaks; doors left open; a check when everyone goes out.": "Füst, CO, gáz és szivárgás; nyitva hagyott ajtók; ellenőrzés, amikor mindenki elmegy.",
+    "Energy": "Energia", "Electricity use from the Energy dashboard's devices.": "Áramfogyasztás az Energia irányítópult eszközei alapján.",
+    "House health": "A ház állapota", "What counts as a problem.": "Mi számít hibának.",
+    "This page": "Ez az oldal", "The sidebar page and its Ask box.": "Az oldalsáv oldal és a Kérdés mezője.",
+    "LOADING…": "BETÖLTÉS…", "TEST ALERT": "PRÓBARIASZTÁS", "UNDO CHANGES": "VÁLTOZÁSOK ELVETÉSE", "SAVE": "MENTÉS",
+    "THE SETTINGS FORM COULDN'T LOAD": "NEM TÖLTÖTT BE A BEÁLLÍTÁSI ŰRLAP", "REFRESH THE PAGE AND TRY AGAIN": "FRISSÍTSD AZ OLDALT, ÉS PRÓBÁLD ÚJRA",
+    "UNSAVED CHANGES": "MENTETLEN VÁLTOZÁSOK", "SAVING…": "MENTÉS…", "SAVED ✓": "MENTVE ✓",
+    // memories
+    "Fact": "Tény", "Preference": "Preferencia", "Person": "Személy", "Routine": "Rutin", "Note": "Jegyzet",
+    "Tap to edit": "Koppints a szerkesztéshez", "Edit": "Szerkesztés", "Forget": "Elfelejtés",
+    "What the house knows and shares with every voice assistant. Tap one to edit it.": "Amit a ház tud, és megoszt minden hangasszisztenssel. Koppints egyre a szerkesztéshez.",
+    "Add a memory, e.g. “The bins go out on Thursday night”": "Új emlék, pl. „A kukát csütörtök este kell kivinni”",
+    "ADD": "HOZZÁAD", "NOTHING MATCHES": "NINCS TALÁLAT", "NOTHING REMEMBERED YET": "MÉG NINCS EMLÉK", "SAY “REMEMBER THAT…”": "MONDD: „JEGYEZD MEG, HOGY…”",
+    // camera spots
+    "Name a part of a camera's picture — \"the rabbit pen\", \"the drive\". Watches and questions that mention it send the AI just that part: sharper answers, cheaper checks.":
+      "Nevezd el a kamerakép egy részét – „a nyúlketrec”, „a felhajtó”. Az ezt említő figyelések és kérdések csak ezt a részt küldik az AI-nak: pontosabb válasz, olcsóbb ellenőrzés.",
+    "↻ NEW PICTURE": "↻ ÚJ KÉP", "NO CAMERAS": "NINCS KAMERA", "new spot": "új pont",
+    "DRAG ON THE PICTURE TO MARK THE SPOT": "HÚZD VÉGIG A KÉPEN A PONT KIJELÖLÉSÉHEZ",
+    "TIP: “DRAW IT” LETS YOU MARK IT YOURSELF — NO AI NEEDED": "TIPP: A „RAJZOLÁS” GOMBBAL TE JELÖLÖD KI – NEM KELL HOZZÁ AI",
+    "TEACH A SPOT": "PONT BETANÍTÁSA", "Name, e.g. the rabbit pen": "Név, pl. a nyúlketrec", "FIND IT WITH AI": "KERESD MEG AI-JAL",
+    "STOP DRAWING": "RAJZOLÁS VÉGE", "DRAW IT": "RAJZOLÁS", "SAVE SPOT": "PONT MENTÉSE", "ON THIS CAMERA": "EZEN A KAMERÁN",
+    "NONE YET": "MÉG NINCS", "ASK THE CAMERA": "KÉRDEZD A KAMERÁT", "What can you see?": "Mit látsz?", "Whole picture": "Teljes kép",
+    "ASK": "KÉRDEZ", "Give the spot a name first.": "Előbb adj nevet a pontnak.", "Drag on the picture to mark it first.": "Előbb jelöld ki a képen.",
+    "LOOKING…": "NÉZEM…", "No answer.": "Nincs válasz.",
+    // named routines
+    "RUN": "FUTTAT", "CHECKS DOORS & WINDOWS": "AJTÓK ÉS ABLAKOK ELLENŐRZÉSE", "CHECKS LIGHTS": "LÁMPÁK ELLENŐRZÉSE", "CHECKS LOCKS": "ZÁRAK ELLENŐRZÉSE",
+    "Named routines — “goodnight”, “good morning”, “leaving”. Say the name to any voice assistant, tap RUN, or call sentient.run_routine. They can check for anything left open or on first.":
+      "Elnevezett rutinok – „jó éjt”, „jó reggelt”, „indulás”. Mondd ki a nevét bármelyik hangasszisztensnek, koppints a FUTTAT gombra, vagy hívd a sentient.run_routine szolgáltatást. Előtte megnézhetik, maradt-e valami nyitva vagy bekapcsolva.",
+    "NO ROUTINES YET": "MÉG NINCS RUTIN", "+ NEW ROUTINE": "+ ÚJ RUTIN", "EDIT ROUTINE": "RUTIN SZERKESZTÉSE", "NEW ROUTINE": "ÚJ RUTIN",
+    "CANCEL": "MÉGSE", "THE FORM COULDN'T LOAD": "NEM TÖLTÖTT BE AZ ŰRLAP", "REFRESH THE PAGE": "FRISSÍTSD AZ OLDALT",
+    "Name": "Név", "Other ways of asking (comma separated)": "Más megfogalmazások (vesszővel elválasztva)", "Say when done": "Ezt mondja a végén",
+    "First check for doors and windows left open": "Előbb nézze meg, maradt-e nyitva ajtó vagy ablak",
+    "First check for lights left on": "Előbb nézze meg, ég-e még lámpa", "First check for anything unlocked": "Előbb nézze meg, maradt-e valami bezáratlanul",
+    "Actions": "Műveletek",
+    // backup
+    "Everything Sentient has learned and been told — memories, camera spots, motion lights, routines, shushes and which learned routines you adopted — in one file. Restoring adds to what's here and never deletes.":
+      "Minden, amit a Sentient megtanult és amit mondtatok neki – emlékek, kamerapontok, mozgásos lámpák, rutinok, elhallgattatások és az átvett tanult rutinok – egy fájlban. A visszaállítás hozzáad a meglévőkhöz, és sosem töröl.",
+    "Download a backup now": "Mentés letöltése most", "DOWNLOAD": "LETÖLTÉS", "Restore from a backup file": "Visszaállítás mentésfájlból",
+    "Also restore settings": "A beállításokat is állítsa vissza", "ALSO SETTINGS": "A BEÁLLÍTÁSOKAT IS", "CHOOSE FILE…": "FÁJL KIVÁLASZTÁSA…",
+    // shushed and learned feedback
+    "UNTIL UNSHUSHED": "AMÍG FEL NEM OLDOD", "Unshush": "Feloldás",
+    "Things the house won't mention — say “stop telling me about the washing machine” (or “for tonight”). Urgent and safety alerts always get through.":
+      "Amiket a ház nem említ – mondd: „ne szólj többet a mosógépről” (vagy „ma estére”). A sürgős és biztonsági riasztások mindig átjutnak.",
+    "NOTHING SHUSHED": "NINCS ELHALLGATTATOTT DOLOG", "UNSHUSH EVERYTHING": "MINDEN FELOLDÁSA", "LEARNED FROM FEEDBACK": "VISSZAJELZÉSBŐL TANULT",
+    "What the house has picked up from shushes, hushing it straight after a remark, and declined or deleted routines. It fades by itself over a month or so; ✕ forgets it now.":
+      "Amit a ház az elhallgattatásokból, a megjegyzés utáni azonnali némításokból és az elutasított vagy törölt rutinokból tanult. Kb. egy hónap alatt magától elhalványul; a ✕ most rögtön elfelejteti.",
+    "FEWER OFFERS": "KEVESEBB AJÁNLAT", "NO MORE OFFERS": "NINCS TÖBB AJÁNLAT", "NOT MENTIONED": "NEM EMLÍTI", "ONLY IF IT MATTERS": "CSAK HA FONTOS",
+    "hushed straight after a remark": "rögtön egy megjegyzés után némították", "shushed for a while": "egy időre elhallgattatták",
+    "shushed": "elhallgattatták", "declined a learned routine": "elutasított egy tanult rutint", "deleted a learned routine": "törölt egy tanult rutint",
+    "Forget this": "Ezt felejtsd el", "NOTHING YET": "MÉG SEMMI",
+    // energy, heating, night watch
+    "ENERGY TODAY": "MAI ENERGIA", "Usual by now": "Eddigre szokásos", "MARKER = USUAL BY NOW": "JELÖLŐ = EDDIGRE SZOKÁSOS",
+    "LEARNING": "TANUL", "WARMS UP EARLY ✓": "KORÁBBAN FŰT ✓", "SPEAKS": "BEMONDJA",
+    "NOTHING UNUSUAL IN THE LAST 3 DAYS": "AZ ELMÚLT 3 NAPBAN SEMMI SZOKATLAN", "HEATING & NIGHT WATCH": "FŰTÉS ÉS ÉJSZAKAI ŐRSÉG",
+    // security
+    "SECURITY": "BIZTONSÁG", "ALL SHUT": "MINDEN ZÁRVA", "OPEN": "NYITVA", "UNLOCKED": "NYITOTT ZÁR",
+    "Doors and windows shut": "Az ajtók és ablakok csukva", "HOME": "OTTHON", "AWAY": "TÁVOL", "NIGHT": "ÉJSZAKA",
+    "VACATION": "SZABADSÁG", "CUSTOM BYPASS": "EGYÉNI", "DISARMED": "KIKAPCSOLVA", "TRIGGERED": "RIASZT", "ARMING": "ÉLESÍTÉS",
+    "PENDING": "FÜGGŐBEN", "DISARMING": "KIKAPCSOLÁS",
+    // motion lights
+    "MOTION LIGHTS": "MOZGÁSOS LÁMPÁK", "LATE NIGHT": "KÉSŐ ÉJJEL", "DIMMED": "TOMPÍTVA", "DARK": "SÖTÉT", "ACTIVE": "AKTÍV",
+    "DAYLIGHT": "NAPPAL", "RESTING": "PIHEN", "OFF": "KI", "ON": "BE", "On": "Be", "Off": "Ki", "COUNTING DOWN": "VISSZASZÁMOL",
+    "ON BY MOTION": "MOZGÁSRA BE", "QUIET": "CSENDES", "READY": "KÉSZEN", "OFF IN QUIET HOURS": "CSENDES ÓRÁKBAN KI",
+    "IGNORES QUIET HOURS": "CSENDES ÓRÁKBAN IS MŰKÖDIK", "SUNSET → SUNRISE": "NAPNYUGTA → NAPKELTE", "ANY TIME": "BÁRMIKOR", "Remove": "Eltávolítás",
+    "Lights that come on with movement between sunset and sunrise and go off when it stops. Each light chooses whether quiet hours keep it off, and how dim it is late at night. A light someone switched on by hand is left alone.":
+      "Lámpák, amelyek napnyugta és napkelte között mozgásra felkapcsolnak, és ha megszűnik, lekapcsolnak. Lámpánként beállítható, hogy csendes órákban kikapcsolva maradjon-e, és mennyire legyen tompa késő éjjel. A kézzel felkapcsolt lámpához nem nyúl.",
+    "Late night (dimmed) from": "Késő éjjel (tompítva) ettől:", "until": "eddig:", "NO MOTION LIGHTS YET": "MÉG NINCS MOZGÁSOS LÁMPA",
+    "+ ADD A MOTION LIGHT": "+ MOZGÁSOS LÁMPA HOZZÁADÁSA", "EDIT MOTION LIGHT": "MOZGÁSOS LÁMPA SZERKESZTÉSE", "NEW MOTION LIGHT": "ÚJ MOZGÁSOS LÁMPA",
+    "Light": "Lámpa", "Motion sensors": "Mozgásérzékelők", "Stay off during quiet hours": "Csendes órákban maradjon kikapcsolva",
+    "Only between sunset and sunrise": "Csak napnyugta és napkelte között", "Off after no movement for": "Kikapcsolás ennyi mozdulatlanság után",
+    "Brightness": "Fényerő", "Late-night brightness": "Késő éjszakai fényerő", "Light sensor (optional)": "Fényérzékelő (opcionális)", "Dark below": "Sötét ez alatt",
+    "Any of these seeing movement turns the light on. Picked from the light's room when you choose the light.":
+      "Ha ezek bármelyike mozgást lát, felkapcsol a lámpa. A lámpa kiválasztásakor a szobája érzékelőiből választ.",
+    "Off: this light still comes on in quiet hours (handy for landings and stairs).": "Ki: ez a lámpa csendes órákban is felkapcsol (folyosón, lépcsőn hasznos).",
+    "Used late at night (the window above). 0 keeps the normal brightness.": "Késő éjjel használja (a fenti időablakban). 0 esetén marad a normál fényerő.",
+    "For dim rooms: with a light sensor, “dark” means it reads below the level here, not just after sunset.":
+      "Sötét szobákhoz: fényérzékelővel a „sötét” azt jelenti, hogy az érték az itt megadott alatt van, nem csak napnyugta után.",
+    "LATE-NIGHT WINDOW SAVED ✓": "KÉSŐ ÉJSZAKAI IDŐSÁV MENTVE ✓",
+    // timeline
+    "SAID": "ELHANGZOTT", "HELD BACK": "VISSZATARTVA", "MODE": "MÓD", "NOTICED": "ÉSZREVETT", "VISITOR": "LÁTOGATÓ", "WATCH": "FIGYELÉS",
+    "LIGHT": "LÁMPA", "HEALTH": "ÁLLAPOT", "DIGEST": "KIVONAT", "ALERT": "RIASZTÁS", "ENERGY": "ENERGIA", "HEATING": "FŰTÉS",
+    "THIS WEEK": "EZEN A HÉTEN", "ALL": "MIND", "LAST 3 DAYS": "ELMÚLT 3 NAP", "TODAY": "MA", "YESTERDAY": "TEGNAP",
+    "Ask for a short AI summary of the last 24 hours.": "Kérj rövid AI-összefoglalót az elmúlt 24 óráról.",
+    "THINKING…": "GONDOLKODIK…", "SUMMARISE 24H": "24 ÓRA ÖSSZEFOGLALÁSA",
+    "THE TIMELINE FILLS AS THE HOUSE SPEAKS, NOTICES AND ACTS": "AZ IDŐVONAL AHOGY A HÁZ BESZÉL, ÉSZREVESZ ÉS CSELEKSZIK, ÚGY TELIK MEG",
+    // dialogs
+    "Leave without saving your changes?": "Kilépsz mentés nélkül?", "Say a test safety alert on every speaker now?": "Mondjon most egy próba biztonsági riasztást minden hangszórón?",
+    "TEST ALERT SENT ✓": "PRÓBARIASZTÁS ELKÜLDVE ✓", "Done.": "Kész.",
+  };
+  const HU_UP = {};
+  for (const [k, v] of Object.entries(HU_WORDS)) { const K = k.toUpperCase(); if (!(K in HU_WORDS)) HU_UP[K] = v.toUpperCase(); }
+  const HU_DAY = { MON: "H", TUE: "K", WED: "SZE", THU: "CS", FRI: "P", SAT: "SZO", SUN: "V",
+    MONDAY: "HÉTFŐ", TUESDAY: "KEDD", WEDNESDAY: "SZERDA", THURSDAY: "CSÜTÖRTÖK", FRIDAY: "PÉNTEK", SATURDAY: "SZOMBAT", SUNDAY: "VASÁRNAP" };
+  const HU_MON = ["január", "február", "március", "április", "május", "június", "július", "augusztus", "szeptember", "október", "november", "december"];
+  const HU_MON_SHORT = ["jan.", "febr.", "márc.", "ápr.", "máj.", "jún.", "júl.", "aug.", "szept.", "okt.", "nov.", "dec."];
+  const EN_MON = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const monthIndex = (m) => EN_MON.indexOf(m.slice(0, 3).toLowerCase());
+  const HU_RULES = [
+    [/^PEOPLE IN ([\s\S]+)$/, "EMBEREK: $1"],
+    [/^(\d+) AI CHECKS TODAY$/, "MA $1 AI-ELLENŐRZÉS"],
+    [/^(?:TILL|UNTIL|UP TO) (\d{1,2}:\d{2})$/, "$1-IG"],
+    [/^(\d+) DELETED$/, "$1 TÖRÖLVE"],
+    [/^Let (\d+) deleted routines? be learned again\?$/, "Visszahozzam a törölt rutinokat ($1 db), hogy újra megtanulhassa őket?"],
+    [/^(\d+) AUTOMATED$/, "$1 AUTOMATIZÁLVA"], [/^(\d+) LEARNED$/, "$1 TANULT"],
+    [/^Stop the house doing: ([\s\S]+)$/, "A ház ne csinálja tovább: $1"],
+    [/^Let the house do this from now on: ([\s\S]+)$/, "Mostantól csinálja a ház: $1"],
+    [/^(\d+) ACTIVE$/, "$1 AKTÍV"], [/^(\d+)H (\d+)M$/, "$1Ó $2P"], [/^(\d+) MIN$/, "$1 PERC"],
+    [/^(\d+) updates? waiting$/, "$1 frissítés vár"], [/^(\d+) PROBLEMS?$/, "$1 HIBA"], [/^(\d+) TODAY$/, "MA $1"],
+    [/^SKIPPED: ([\s\S]+)$/, "KIHAGYVA: $1"], [/^ERROR: ([\s\S]+)$/, "HIBA: $1"], [/^HELD: ([\s\S]+)$/, "VISSZATARTVA: $1"],
+    [/^(\d+) remembered$/, "$1 megjegyezve"], [/^(\d+) taught$/, "$1 betanítva"], [/^(\d+) muted$/, "$1 némítva"], [/^(\d+) lights?$/, "$1 lámpa"],
+    [/^USED (\d+)×$/, "$1× HASZNÁLVA"],
+    [/^(\d{1,2}) ([A-Za-z]{3,4})$/, (s, d, m) => (monthIndex(m) < 0 ? s : `${HU_MON_SHORT[monthIndex(m)]} ${d}.`)],
+    [/^Search (\d+) memories…$/, "Keresés $1 emlék között…"],
+    [/^Is anything in ([\s\S]+)\?$/, "Van valami itt: $1?"],
+    [/^Looking for ([\s\S]+)…$/, "Keresem: $1…"], [/^Found ([\s\S]+)\.$/, "Megvan: $1."],
+    [/^Saved (\d+) memories, (\d+) spots, (\d+) motion lights and (\d+) routines\.$/, "Elmentve: $1 emlék, $2 kamerapont, $3 mozgásos lámpa és $4 rutin."],
+    [/^Saved ([\s\S]+)\.$/, "Elmentve: $1."],
+    [/^(\d+) STEPS?$/, "$1 LÉPÉS"], [/^SAYS “([\s\S]*)”$/, "MONDJA: „$1”"], [/^LAST RUN ([\s\S]+)$/, "UTOLJÁRA: $1"],
+    [/^Restore ([\s\S]+)\? It adds to what's here and doesn't delete anything\.$/, "Visszaállítod: $1? Hozzáadja a meglévőkhöz, és nem töröl semmit."],
+    [/^Restored: ([\s\S]*)$/, "Visszaállítva: $1"],
+    [/^£([\d.,]+)$/, (s, v) => `${Math.round(parseFloat(v.replace(",", "")))} Ft`], [/^(\d+)% OF USUAL$/, "A SZOKÁSOS $1%-A"],
+    [/^WEEKDAYS ([\s\S]+)$/, "HÉTKÖZNAP $1"], [/^WEEKENDS ([\s\S]+)$/, "HÉTVÉGÉN $1"],
+    [/^WARM BY ([\s\S]+)$/, (s, rest) => "MELEG LEGYEN: " + huCore(rest, 1)],
+    [/^(-?[\d.]+)° NOW$/, "MOST $1°"], [/^(-?[\d.]+)°\/H$/, "$1°/Ó"], [/^USUALLY (-?[\d.]+)°$/, "ÁLTALÁBAN $1°"],
+    [/^TO BE (-?[\d.]+)° BY (\S+) IT NEEDS TO START (\S+)$/, "HOGY $2-RA $1° LEGYEN, $3-KOR KELL INDULNIA"],
+    [/^(\d+) DAYS$/, "$1 NAP"], [/^(\d+) WATCHED$/, "$1 FIGYELT"], [/^(\d+) OPEN$/, "$1 NYITVA"],
+    [/^(\d+) ON BY MOTION NOW$/, "MOST $1 ÉG MOZGÁSRA"],
+    [/^BELOW ([\d.]+) LX$/, "$1 LX ALATT"], [/^OFF AFTER ([\d.]+) MIN$/, "$1 PERC UTÁN KI"], [/^(\d+)% LATE$/, "KÉSŐN $1%"],
+    [/^LAST: ([\s\S]+)$/, "UTOLJÁRA: $1"],
+    [/^(MON|TUE|WED|THU|FRI|SAT|SUN) (\d{1,2}:\d{2})$/, (s, d, t) => `${HU_DAY[d]} ${t}`],
+    [/^(MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY) (\d{1,2}) ([A-Z]+)$/,
+      (s, d, n, m) => (monthIndex(m) < 0 ? s : `${HU_MON[monthIndex(m)].toUpperCase()} ${n}., ${HU_DAY[d]}`)],
+    [/^Forget: ([\s\S]+)\?$/, "Elfelejtsem: $1?"], [/^Stop: ([\s\S]+)\?$/, "Leállítsam: $1?"],
+    [/^Delete this for good\? It won't be learned or offered again\.([\s\S]*)$/, "Végleg törlöd? Többé nem tanulja meg és nem ajánlja fel.$1"],
+    [/^Delete the routine “([\s\S]+)”\?$/, "Törlöd ezt a rutint: „$1”?"],
+    [/^Stop ([\s\S]+) following motion\?$/, "$1 ne kövesse tovább a mozgást?"],
+    [/^Forget the spot “([\s\S]+)”\?$/, "Elfelejtsem ezt a pontot: „$1”?"],
+  ];
+  const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const huCore = (s, depth = 0) => {
+    if (own(HU_WORDS, s)) return HU_WORDS[s];
+    if (own(HU_UP, s)) return HU_UP[s];
+    if (own(HU_DAY, s)) return HU_DAY[s];
+    if (depth < 3 && s.includes(" · ")) {  // part by part first, so a rule never swallows the next part
+      const parts = s.split(" · ");
+      if (/^SET$/.test(parts[0]) && parts.length === 2) return `ÉLESÍTVE · ${huCore(parts[1], depth + 1)}`;  // the alarm
+      const out = parts.map((p) => huCore(p, depth + 1));
+      if (out.some((p, i) => p !== parts[i])) return out.join(" · ");
+      return s;
+    }
+    for (const [re, to] of HU_RULES) {
+      const m = re.exec(s);
+      if (m) return typeof to === "function" ? to(...m) : s.replace(re, to);
+    }
+    const n = depth < 3 && /^(.*\S) (\d+)$/.exec(s);  // "FACT 3", "SAID 12"
+    if (n) { const h = huCore(n[1], depth + 1); if (h !== n[1]) return `${h} ${n[2]}`; }
+    return s;
+  };
+  const huText = (s) => {
+    if (typeof s !== "string" || !/[A-Za-z£]/.test(s)) return s;
+    const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(s);
+    const out = huCore(m[2]);
+    return out === m[2] ? s : m[1] + out + m[3];
+  };
+  const HU_ATTRS = ["placeholder", "title", "data-text"];
+  const huAttrs = (el) => {
+    for (const a of HU_ATTRS) {
+      if (!el.hasAttribute(a)) continue;
+      const v = el.getAttribute(a), t = huText(v);
+      if (t !== v) el.setAttribute(a, t);
+    }
+  };
+  const huForm = (form) => {
+    if (form.__hu) return;
+    form.__hu = true;
+    const label = form.computeLabel, helper = form.computeHelper;
+    if (label) form.computeLabel = (s) => huText(label(s));
+    if (helper) form.computeHelper = (s) => huText(helper(s));
+    if (form.requestUpdate) form.requestUpdate();
+  };
+  const huNode = (node) => {
+    if (node.nodeType === 3) { const v = node.nodeValue, t = huText(v); if (t !== v) node.nodeValue = t; return; }
+    if (node.nodeType === 1) {
+      if (["STYLE", "SCRIPT", "TEXTAREA"].includes(node.tagName)) return;
+      if (node.classList && node.classList.contains("q")) return;  // the question someone typed
+      huAttrs(node);
+      if (node.tagName === "HA-FORM") huForm(node);
+    } else if (node.nodeType !== 11) return;
+    for (const child of node.childNodes) huNode(child);
+  };
+  let huDialogs = false;
+  const huWatch = (panel) => {
+    const hass = panel._hass || {};
+    const lang = String(hass.language || (hass.locale && hass.locale.language) || "").toLowerCase();
+    if (!lang.startsWith("hu") || !panel.shadowRoot) return;
+    if (!huDialogs) {  // confirm and alert texts the page builds itself
+      huDialogs = true;
+      const confirm = window.confirm.bind(window), alert = window.alert.bind(window);
+      window.confirm = (m) => confirm(huText(String(m)));
+      window.alert = (m) => alert(huText(String(m)));
+    }
+    const root = panel.shadowRoot;
+    let busy = false;
+    const obs = new MutationObserver((records) => {
+      if (busy) return;
+      busy = true;
+      try {
+        for (const r of records) {
+          if (r.type === "attributes") huAttrs(r.target);
+          else if (r.type === "characterData") huNode(r.target);
+          else r.addedNodes.forEach(huNode);
+        }
+      } finally { obs.takeRecords(); busy = false; }
+    });
+    huNode(root);
+    obs.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: HU_ATTRS });
+  };
+  const huBuild = SentientPanel.prototype._build;
+  SentientPanel.prototype._build = function () { huBuild.call(this); huWatch(this); };
+  if (typeof globalThis.__sentientHuTest === "function") globalThis.__sentientHuTest({ huText });  // the fork's tests
+
   customElements.define("sentient-panel", SentientPanel);
 })();

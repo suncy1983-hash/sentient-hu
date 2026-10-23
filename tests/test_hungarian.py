@@ -67,6 +67,16 @@ def test_spoken_sentences_in_hungarian() -> None:
     assert "Hungarian" in i18n.write_in()
 
 
+def test_timeline_and_motion_notes_in_hungarian() -> None:
+    i18n.set_language("hu")
+    assert i18n.t("timeline.held", reason=i18n.reason("quiet_hours")) == "visszatartva: csendes órák"
+    assert i18n.t("timeline.hushed_until", time="22:00") == "Némítva 22:00-ig"
+    assert i18n.t("motion.on_late", pct=10) == "bekapcsolt 10%-on (késő éjjel)"
+    assert i18n.t("night.overnight_alert", name="Kapu", time="03:12") == "Kapu 03:12-kor nyílt ki, senki sem volt fent (riasztott)"
+    i18n.set_language("en")
+    assert i18n.reason("no_speaker") == "no speaker"
+
+
 def test_english_is_unchanged() -> None:
     assert i18n.clock(17, 30) == "5:30pm"
     assert i18n.t("welcome.plain") == "Welcome back."

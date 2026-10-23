@@ -26,6 +26,7 @@ from homeassistant.helpers.sun import is_up
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .i18n import t
 from .speech import SpeechRouter, in_quiet_hours
 
 _LOGGER = logging.getLogger(__name__)
@@ -261,7 +262,7 @@ class MotionLights:
         if event.context.id not in self._ours[rule.light]:
             # someone changed it by hand: theirs now, so don't switch it off on them
             self._release(rule.light)
-            self._note(rule, "taken over by hand")
+            self._note(rule, t("motion.taken_over"))
 
     @callback
     def _release(self, light: str) -> None:
@@ -288,11 +289,11 @@ class MotionLights:
         if rule.only_dark and not self._dark(rule):
             return
         if rule.respect_quiet and self.speech.quiet_hours_now():
-            self._note(rule, "stayed off: quiet hours")
+            self._note(rule, t("motion.quiet"))
             return
         late = self.late_night() and rule.night_brightness > 0
         self._turn(rule, True, rule.night_brightness if late else rule.brightness)
-        self._note(rule, f"on at {rule.night_brightness}% (late night)" if late else "on with motion")
+        self._note(rule, t("motion.on_late", pct=rule.night_brightness) if late else t("motion.on"))
 
     @callback
     def _on_still(self, rule: MotionRule) -> None:
@@ -305,7 +306,7 @@ class MotionLights:
             self._timers.pop(rule.light, None)
             if rule.light in self._ours and not self._motion_now(rule):
                 self._turn(rule, False)
-                self._note(rule, "off: no movement")
+                self._note(rule, t("motion.off"))
 
         self._timers[rule.light] = async_call_later(self.hass, rule.off_after * 60, _off)
 

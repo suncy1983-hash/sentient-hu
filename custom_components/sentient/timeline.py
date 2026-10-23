@@ -27,6 +27,8 @@ from .const import (
     EVENT_VISITOR,
     EVENT_WATCH_FIRED,
 )
+from . import i18n
+from .i18n import t
 from .motion_lights import EVENT_MOTION_LIGHT
 from .presence import area_of
 
@@ -107,15 +109,16 @@ class Timeline:
     @callback
     def _held(self, event: Event) -> None:
         d = event.data
-        reason = str(d.get("reason") or "").split(":")[0].replace("_", " ")
-        self.add("held", d.get("message", ""), f"held back: {reason}" if reason else None, reason=d.get("reason"), source=d.get("source"))
+        reason = i18n.reason(d.get("reason") or "")
+        self.add("held", d.get("message", ""), t("timeline.held", reason=reason) if reason else None,
+                 reason=d.get("reason"), source=d.get("source"))
 
     @callback
     def _noticed(self, event: Event) -> None:
         d = event.data
         if d.get("result") != "stayed quiet":
             return  # remarks it made show up as "said"; skips are routine
-        self.add("noticed", "; ".join(d.get("changes") or []), "noticed, decided it wasn't worth saying")
+        self.add("noticed", "; ".join(d.get("changes") or []), t("timeline.noticed_quiet"))
 
     @callback
     def _visitor(self, _event: Event) -> None:
@@ -126,7 +129,7 @@ class Timeline:
         self._seen_visit = visit.get("time")
         who = f"{visit['name']} — " if visit.get("name") else ""
         self.add(
-            "visitor", f"{who}{visit.get('description') or 'Someone at the door'}", visit.get("kind"),
+            "visitor", f"{who}{visit.get('description') or t('timeline.someone_at_door')}", visit.get("kind"),
             parcel=bool(visit.get("parcel_left")) or None,
         )
 
@@ -144,14 +147,14 @@ class Timeline:
     def _mode(self, event: Event) -> None:
         d = event.data
         if "chime" in d:
-            self.add("mode", "Chime on" if d["chime"] else "Chime off")
+            self.add("mode", t("timeline.chime_on" if d["chime"] else "timeline.chime_off"))
         elif "guest_mode" in d:
-            self.add("mode", "Guest mode on" if d["guest_mode"] else "Guest mode off")
+            self.add("mode", t("timeline.guest_on" if d["guest_mode"] else "timeline.guest_off"))
         elif d.get("hush") and d.get("until"):
             until = dt_util.as_local(dt_util.parse_datetime(d["until"]))
-            self.add("mode", f"Hushed until {until:%H:%M}")
+            self.add("mode", t("timeline.hushed_until", time=f"{until:%H:%M}"))
         elif "hush" in d:
-            self.add("mode", "Talking again")
+            self.add("mode", t("timeline.talking_again"))
 
     @callback
     def _health(self, event: Event) -> None:
@@ -169,7 +172,7 @@ class Timeline:
         for key, line in before.items():
             if key not in now:
                 name = key.split(":", 1)[1]
-                self.add("health", f"{name} is back to normal" if key.startswith("offline") else f"{name}: battery fine again")
+                self.add("health", t("timeline.back_online" if key.startswith("offline") else "timeline.battery_ok", name=name))
 
     def _starting(self, _event: Event) -> bool:
         return dt_util.utcnow() - self._started < timedelta(minutes=12)

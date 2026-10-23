@@ -149,6 +149,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "night.someone_up": "someone was up inside first ({inside}), so not alerting",
         "night.alert": "{name} opened at {time}. Nobody was moving inside and it doesn't normally open at this time.",
         "night.detail": "night watch",
+        "night.overnight_alert": "{name} opened at {time} with nobody up (alerted)",
+        "night.overnight_up": "{name} opened at {time} (someone was up)",
         "night.spoken": "Heads up: the {name_lower} has just opened, and nobody's been moving inside.",
         # visitors
         "visitors.parcel_left": "A parcel's been left at the front door.",
@@ -223,6 +225,24 @@ STRINGS: dict[str, dict[str, str]] = {
         "health.offline": "{name} is offline",
         "health.battery": "{name} is at {level}%",
         "health.low": "{name} is low",
+        # timeline
+        "timeline.held": "held back: {reason}",
+        "timeline.noticed_quiet": "noticed, decided it wasn't worth saying",
+        "timeline.someone_at_door": "Someone at the door",
+        "timeline.chime_on": "Chime on",
+        "timeline.chime_off": "Chime off",
+        "timeline.guest_on": "Guest mode on",
+        "timeline.guest_off": "Guest mode off",
+        "timeline.hushed_until": "Hushed until {time}",
+        "timeline.talking_again": "Talking again",
+        "timeline.back_online": "{name} is back to normal",
+        "timeline.battery_ok": "{name}: battery fine again",
+        # motion lights
+        "motion.taken_over": "taken over by hand",
+        "motion.quiet": "stayed off: quiet hours",
+        "motion.on_late": "on at {pct}% (late night)",
+        "motion.on": "on with motion",
+        "motion.off": "off: no movement",
         # calendar tool
         "calendar.none": "There's no calendar to add events to",
         "calendar.not_found": "I can't find a calendar called '{name}'",
@@ -254,6 +274,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "night.someone_up": "előtte már mozgott valaki bent ({inside}), ezért nincs riasztás",
         "night.alert": "{name} {time}-kor kinyílt. Bent senki nem mozgott, és ilyenkor általában nem nyílik ki.",
         "night.detail": "éjszakai őrség",
+        "night.overnight_alert": "{name} {time}-kor nyílt ki, senki sem volt fent (riasztott)",
+        "night.overnight_up": "{name} {time}-kor nyílt ki (valaki fent volt)",
         "night.spoken": "Figyelem: {name_art} most nyílt ki, és bent senki nem mozgott.",
         "visitors.parcel_left": "Csomagot hagytak a bejárati ajtónál.",
         "visitors.named_at_door": "{name} van az ajtónál.",
@@ -317,6 +339,22 @@ STRINGS: dict[str, dict[str, str]] = {
         "health.offline": "{name} nem elérhető",
         "health.battery": "{name}: akkumulátor {level}%",
         "health.low": "{name}: lemerülőben",
+        "timeline.held": "visszatartva: {reason}",
+        "timeline.noticed_quiet": "észrevette, de nem tartotta érdemesnek szólni",
+        "timeline.someone_at_door": "Valaki az ajtónál",
+        "timeline.chime_on": "Csengőhang be",
+        "timeline.chime_off": "Csengőhang ki",
+        "timeline.guest_on": "Vendégmód be",
+        "timeline.guest_off": "Vendégmód ki",
+        "timeline.hushed_until": "Némítva {time}-ig",
+        "timeline.talking_again": "Újra beszél",
+        "timeline.back_online": "{name} újra rendben",
+        "timeline.battery_ok": "{name}: akkumulátor újra rendben",
+        "motion.taken_over": "kézzel átvéve",
+        "motion.quiet": "kikapcsolva maradt: csendes órák",
+        "motion.on_late": "bekapcsolt {pct}%-on (késő éjjel)",
+        "motion.on": "mozgásra bekapcsolt",
+        "motion.off": "kikapcsolt: nincs mozgás",
         "calendar.none": "Nincs olyan naptár, amibe eseményt lehetne felvenni",
         "calendar.not_found": "Nem találok '{name}' nevű naptárat",
         "calendar.bad_time": "Nem értem ezt az időpontot: '{value}'",
@@ -343,6 +381,18 @@ def t(key: str, **kwargs: Any) -> str:
             extra[f"{capital(k)}_art"] = capital(article(v))
             extra[capital(k)] = capital(v)
     return template.format(**{**extra, **kwargs})
+
+
+_HU_REASONS = {
+    "quiet hours": "csendes órák", "hushed": "némítva", "duplicate": "ismétlés", "no speaker": "nincs hangszóró",
+    "busy": "foglalt", "empty": "üres", "muted": "elhallgattatva", "hushed by": "csend egy automatizáció után",
+}
+
+
+def reason(code: str) -> str:
+    """'quiet_hours:...' → 'quiet hours' / 'csendes órák' — why something was held back."""
+    plain = str(code or "").split(":")[0].replace("_", " ")
+    return _HU_REASONS.get(plain, plain) if is_hu() else plain
 
 
 def title(text: str) -> str:

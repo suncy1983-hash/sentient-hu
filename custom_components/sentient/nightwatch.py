@@ -212,7 +212,8 @@ class NightWatch:
         for e in self.events:
             when = dt_util.parse_datetime(e["time"])
             if when and when >= cutoff:
-                out.append(f"{e['name']} opened at {when:%H:%M}" + (" with nobody up (alerted)" if e.get("alert") else " (someone was up)"))
+                out.append(t("night.overnight_alert" if e.get("alert") else "night.overnight_up",
+                             name=e["name"], time=f"{when:%H:%M}"))
         return out
 
     def describe(self) -> dict[str, Any]:
