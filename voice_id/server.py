@@ -252,11 +252,13 @@ class TextModel:
         self._tokenizer = tok
         _LOGGER.info("Text model loaded (%s)", ", ".join(self._inputs))
 
-    def __call__(self, texts: list[str], kind: str) -> np.ndarray:
+    def __call__(self, texts: list[str], kind: "str | list[str]") -> np.ndarray:
         if self._session is None:
             self._load()
-        prefix = "query: " if kind == "query" else "passage: "
-        enc = self._tokenizer.encode_batch([prefix + t for t in texts])
+        kinds = kind if isinstance(kind, list) else [kind] * len(texts)
+        enc = self._tokenizer.encode_batch(
+            [("query: " if k == "query" else "passage: ") + t for t, k in zip(texts, kinds)]
+        )
         ids = np.array([e.ids for e in enc], dtype=np.int64)
         mask = np.array([e.attention_mask for e in enc], dtype=np.int64)
         feeds = {"input_ids": ids, "attention_mask": mask}
@@ -285,6 +287,8 @@ class Meaning:
             raise web.HTTPBadRequest(text="JSON needed") from err
         texts = [str(t) for t in data.get("texts") or []][: self.MAX_TEXTS]
         kind = "query" if data.get("kind") == "query" else "passage"
+        if isinstance(data.get("kinds"), list) and len(data["kinds"]) >= len(texts):  # one per text
+            kind = ["query" if k == "query" else "passage" for k in data["kinds"][: len(texts)]]
         if not texts:
             return web.json_response({"model": self.MODEL_ID, "vectors": []})
         async with self._lock:
@@ -319,14 +323,17 @@ def main() -> None:
     _LOGGER.info("Voice ID ready: %d voices, threshold %.2f, margin %.2f", len(voices.people),
                  voices.threshold, voices.margin)
     meaning = None
-    if Path(TEXT_MODEL, "model.onnx").exists():
+    wanted = str(options.get("text_model", "base"))
+    folders = [Path(TEXT_MODEL) / wanted, Path(TEXT_MODEL) / ("small" if wanted == "base" else "base"), Path(TEXT_MODEL)]
+    folder = next((f for f in folders if (f / "model.onnx").exists()), None)
+    if folder is not None:
         try:
-            model_id = Path(TEXT_MODEL, "MODEL_ID").read_text().strip()
+            model_id = (folder / "MODEL_ID").read_text().strip()
         except OSError:
             model_id = "multilingual-e5"
-        meaning = Meaning(TextModel(TEXT_MODEL), model_id)
+        meaning = Meaning(TextModel(str(folder)), model_id)
         _LOGGER.info("Text model: %s", model_id)
-    if meaning is None:
+    else:
         _LOGGER.warning("No text model in %s: semantic memory is off", TEXT_MODEL)
     web.run_app(Service(voices, make_embedder(MODEL), meaning).app(),
                 port=int(os.environ.get("VOICE_ID_PORT", "8765")), print=None)

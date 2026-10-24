@@ -13,20 +13,25 @@ ADD https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-
 # multilingual-e5-base, quantised (about 280 MB): sentences in Hungarian and 100 other languages to
 # numbers for meaning, for Sentient's semantic memory. Falls back to the small model (about 120 MB) if the
 # base one can't be downloaded; MODEL_ID records which it is, so Sentient knows when it changes.
+# Both sizes are kept; the app's text_model option picks one (base by default).
 RUN python3 - <<'EOF'
 import urllib.request, pathlib
-out = pathlib.Path("/models/e5"); out.mkdir(parents=True, exist_ok=True)
 files = {"model.onnx": "onnx/model_quantized.onnx", "tokenizer.json": "tokenizer.json"}
-for repo in ["Xenova/multilingual-e5-base", "Xenova/multilingual-e5-small", "MintplexLabs/multilingual-e5-small"]:
+got = 0
+for size, repo in [("base", "Xenova/multilingual-e5-base"), ("small", "Xenova/multilingual-e5-small")]:
+    out = pathlib.Path("/models/e5") / size
+    out.mkdir(parents=True, exist_ok=True)
     try:
         for name, path in files.items():
             urllib.request.urlretrieve(f"https://huggingface.co/{repo}/resolve/main/{path}", out / name)
             print("got", name, "from", repo, (out / name).stat().st_size)
         (out / "MODEL_ID").write_text(repo.split("/")[1])
-        break
+        got += 1
     except Exception as err:
         print("not from", repo, err)
-else:
+        for f in out.iterdir():
+            f.unlink()
+if not got:
     raise SystemExit("could not download a text model")
 EOF
 
