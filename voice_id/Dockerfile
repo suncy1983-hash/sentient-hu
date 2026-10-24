@@ -10,23 +10,24 @@ RUN pip install --no-cache-dir "sherpa-onnx==1.13.8" "numpy>=1.26,<3" "aiohttp>=
 # WeSpeaker ResNet34 (VoxCeleb), about 26 MB: turns a few seconds of speech into a voice print.
 ADD https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_en_voxceleb_resnet34.onnx /models/wespeaker.onnx
 
-# multilingual-e5-small, quantised (about 120 MB): sentences in Hungarian and 100 other languages to
-# numbers for meaning, for Sentient's semantic memory. Tries a second copy if the first is missing.
+# multilingual-e5-base, quantised (about 280 MB): sentences in Hungarian and 100 other languages to
+# numbers for meaning, for Sentient's semantic memory. Falls back to the small model (about 120 MB) if the
+# base one can't be downloaded; MODEL_ID records which it is, so Sentient knows when it changes.
 RUN python3 - <<'EOF'
 import urllib.request, pathlib
 out = pathlib.Path("/models/e5"); out.mkdir(parents=True, exist_ok=True)
-repos = ["Xenova/multilingual-e5-small", "MintplexLabs/multilingual-e5-small"]
 files = {"model.onnx": "onnx/model_quantized.onnx", "tokenizer.json": "tokenizer.json"}
-for name, path in files.items():
-    for repo in repos:
-        try:
+for repo in ["Xenova/multilingual-e5-base", "Xenova/multilingual-e5-small", "MintplexLabs/multilingual-e5-small"]:
+    try:
+        for name, path in files.items():
             urllib.request.urlretrieve(f"https://huggingface.co/{repo}/resolve/main/{path}", out / name)
             print("got", name, "from", repo, (out / name).stat().st_size)
-            break
-        except Exception as err:
-            print("not from", repo, err)
-    else:
-        raise SystemExit(f"could not download {name}")
+        (out / "MODEL_ID").write_text(repo.split("/")[1])
+        break
+    except Exception as err:
+        print("not from", repo, err)
+else:
+    raise SystemExit("could not download a text model")
 EOF
 
 COPY server.py /server.py

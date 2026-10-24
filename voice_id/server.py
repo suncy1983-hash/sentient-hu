@@ -226,7 +226,7 @@ class Service:
 
 
 class TextModel:
-    """multilingual-e5-small: sentences in any language (Hungarian included) to 384 numbers for meaning.
+    """multilingual-e5 (base): sentences in any language (Hungarian included) to numbers for meaning.
 
     Loaded on first use. e5 wants "query: " in front of what is searched for and "passage: " in front of
     what is searched in; vectors are the mean over tokens, normalised.
@@ -271,11 +271,11 @@ class TextModel:
 class Meaning:
     """POST /embed {"texts": [...], "kind": "query"|"passage"} -> {"model": ..., "vectors": [[...], ...]}"""
 
-    MODEL_ID = "multilingual-e5-small"
     MAX_TEXTS = 64
 
-    def __init__(self, embed_texts) -> None:
+    def __init__(self, embed_texts, model_id: str = "multilingual-e5-base") -> None:
         self.embed_texts = embed_texts
+        self.MODEL_ID = model_id  # Sentient works every memory out again when this changes
         self._lock = asyncio.Lock()
 
     async def embed(self, request: web.Request) -> web.Response:
@@ -318,7 +318,14 @@ def main() -> None:
                     bool(options.get("learn", True)))
     _LOGGER.info("Voice ID ready: %d voices, threshold %.2f, margin %.2f", len(voices.people),
                  voices.threshold, voices.margin)
-    meaning = Meaning(TextModel(TEXT_MODEL)) if Path(TEXT_MODEL, "model.onnx").exists() else None
+    meaning = None
+    if Path(TEXT_MODEL, "model.onnx").exists():
+        try:
+            model_id = Path(TEXT_MODEL, "MODEL_ID").read_text().strip()
+        except OSError:
+            model_id = "multilingual-e5"
+        meaning = Meaning(TextModel(TEXT_MODEL), model_id)
+        _LOGGER.info("Text model: %s", model_id)
     if meaning is None:
         _LOGGER.warning("No text model in %s: semantic memory is off", TEXT_MODEL)
     web.run_app(Service(voices, make_embedder(MODEL), meaning).app(),

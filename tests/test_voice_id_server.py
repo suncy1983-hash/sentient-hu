@@ -78,7 +78,7 @@ async def test_embed_endpoint(tmp_path, socket_enabled) -> None:
         seen.append(kind)
         return np.array([[1.0, 0.0] for _ in texts])
 
-    svc = server.Service(server.Voices(tmp_path), _embed, server.Meaning(embed_texts))
+    svc = server.Service(server.Voices(tmp_path), _embed, server.Meaning(embed_texts, "multilingual-e5-small"))
     async with TestClient(TestServer(svc.app())) as client:
         res = await (await client.post("/embed", json={"texts": ["a kút", "kávé"], "kind": "query"})).json()
         assert res["model"] == "multilingual-e5-small" and res["vectors"] == [[1.0, 0.0], [1.0, 0.0]]

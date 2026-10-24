@@ -1,6 +1,6 @@
 """Semantic memory: finding memories by meaning, not just by shared words.
 
-Each memory gets a vector from the Sentient app's text model (multilingual-e5-small, local, Hungarian
+Each memory gets a vector from the Sentient app's text model (multilingual-e5, local, Hungarian
 included). Vectors live in their own store, keyed by memory id and a hash of the text, and are worked out
 in the background whenever memories change — so adding a memory never waits for the model, and nothing
 breaks if the app is away: search simply falls back to keywords until it is back.
