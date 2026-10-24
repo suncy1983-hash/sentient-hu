@@ -138,8 +138,11 @@ class Visitors:
         if not name:
             return False
         wanted = _fold(name)
+        reg = er.async_get(self.hass)
         for st in self.hass.states.async_all("person"):
             names = {_fold(st.name), _fold(st.entity_id.split(".", 1)[1].replace("_", " "))}
+            if (entry := reg.async_get(st.entity_id)) is not None:
+                names |= {_fold(alias) for alias in entry.aliases if isinstance(alias, str)}
             if wanted in names or wanted.split(" ")[0] in {n.split(" ")[0] for n in names if n}:
                 return True
         return False

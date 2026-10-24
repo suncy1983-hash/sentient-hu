@@ -190,7 +190,10 @@ async def test_household_is_logged_but_not_announced_or_notified(hass: HomeAssis
                  door_triggers=["binary_sensor.kapu_person"])
     _gate_device(hass)
     hass.states.async_set("notify.phone", "unknown")
-    hass.states.async_set("person.sanya", "home", {"friendly_name": "Sanya"})
+    from homeassistant.helpers import entity_registry as er
+    person = er.async_get(hass).async_get_or_create("person", "person", "suncy", suggested_object_id="suncy")
+    er.async_get(hass).async_update_entity(person.entity_id, aliases={"Sanya"})
+    hass.states.async_set("person.suncy", "home", {"friendly_name": "Suncy"})
     freezer.tick(timedelta(minutes=10))
     await hass.async_block_till_done()
     said = async_mock_service(hass, "assist_satellite", "announce")
