@@ -128,9 +128,12 @@ class Timeline:
         visit = log[0]
         self._seen_visit = visit.get("time")
         who = f"{visit['name']} — " if visit.get("name") else ""
+        where = f"{visit['place']}: " if visit.get("place") else ""
         self.add(
-            "visitor", f"{who}{visit.get('description') or t('timeline.someone_at_door')}", visit.get("kind"),
+            "visitor", f"{where}{who}{visit.get('description') or t('timeline.someone_at_door')}", visit.get("kind"),
             parcel=bool(visit.get("parcel_left")) or None,
+            # the household coming and going, or a false alarm: keep it in the log, don't notify
+            quiet=(bool(visit.get("household")) or visit.get("kind") == "nobody") or None,
         )
 
     @callback

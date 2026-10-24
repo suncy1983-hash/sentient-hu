@@ -37,7 +37,7 @@ def wanted(item: dict[str, Any], kinds: set[str]) -> str | None:
             return "Held back for quiet hours"
         if "unheard" in kinds and reason == "no_speaker":
             return "Nobody heard this"
-    if kind == "visitor" and "visitors" in kinds:
+    if kind == "visitor" and "visitors" in kinds and not item.get("quiet"):
         return "Parcel left" if item.get("parcel") else "At the door"
     if kind == "watch" and "watches" in kinds:
         return "Watch"

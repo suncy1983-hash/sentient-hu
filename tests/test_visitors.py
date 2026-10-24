@@ -151,3 +151,64 @@ async def test_doorstep_check_skipped_after_a_ring_and_when_parcels_off(hass: Ho
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
     assert len(ai) == 1  # only the doorbell look
+
+
+def _gate_device(hass: HomeAssistant) -> None:
+    """A gate camera whose own person sensor and face sensor live on the same device."""
+    from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+    owner = MockConfigEntry(domain="eufy_test")
+    owner.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(config_entry_id=owner.entry_id, identifiers={("eufy_test", "gate")})
+    reg = er.async_get(hass)
+    for domain, uid, object_id in [("camera", "cam", "kapu"), ("binary_sensor", "person", "kapu_person"),
+                                   ("sensor", "face", "kapu_last_person")]:
+        reg.async_get_or_create(domain, "eufy_test", uid, suggested_object_id=object_id,
+                                config_entry=owner, device_id=device.id)
+    hass.states.async_set("camera.kapu", "idle", {"friendly_name": "Kapu"})
+    hass.states.async_set("binary_sensor.kapu_person", "off")
+
+
+async def test_gate_trigger_looks_through_its_own_camera(hass: HomeAssistant) -> None:
+    await _setup(hass, announce_visitors=True, parcel_alerts=False,
+                 door_triggers=["binary_sensor.doorbell", "binary_sensor.kapu_person"])
+    _gate_device(hass)
+    await hass.async_block_till_done()
+    said = async_mock_service(hass, "assist_satellite", "announce")
+    ai = _ai(hass, [{"kind": "visitor", "description": "A postman"}])
+    with patch("custom_components.sentient.visitors.asyncio.sleep"):
+        hass.states.async_set("binary_sensor.kapu_person", "on")
+        await hass.async_block_till_done()
+    assert ai[0].data["attachments"][0]["media_content_id"] == "media-source://camera/camera.kapu"
+    assert said[-1].data["message"] == "Kapu: someone's there — A postman."
+    timeline = hass.states.get("sensor.nova_visitors").attributes["recent"][0]
+    assert timeline["place"] == "Kapu"
+
+
+async def test_household_is_logged_but_not_announced_or_notified(hass: HomeAssistant, freezer) -> None:
+    await _setup(hass, announce_visitors=True, parcel_alerts=False, notify_targets=["notify.phone"],
+                 door_triggers=["binary_sensor.kapu_person"])
+    _gate_device(hass)
+    hass.states.async_set("notify.phone", "unknown")
+    hass.states.async_set("person.sanya", "home", {"friendly_name": "Sanya"})
+    freezer.tick(timedelta(minutes=10))
+    await hass.async_block_till_done()
+    said = async_mock_service(hass, "assist_satellite", "announce")
+    sent = async_mock_service(hass, "notify", "send_message")
+    _ai(hass, [{"kind": "visitor", "description": "A man walking in"}])
+    hass.states.async_set("sensor.kapu_last_person", "Sanya")
+    with patch("custom_components.sentient.visitors.asyncio.sleep"):
+        hass.states.async_set("binary_sensor.kapu_person", "on")
+        await hass.async_block_till_done()
+    assert not said and not sent
+    assert hass.states.get("sensor.nova_visitors").attributes["recent"][0]["household"] is True
+
+    # a stranger an hour later is told about
+    freezer.tick(timedelta(hours=1))
+    hass.states.async_set("sensor.kapu_last_person", "Stranger")
+    hass.states.async_set("binary_sensor.kapu_person", "off")
+    await hass.async_block_till_done()
+    with patch("custom_components.sentient.visitors.asyncio.sleep"):
+        hass.states.async_set("binary_sensor.kapu_person", "on")
+        await hass.async_block_till_done()
+    assert len(said) == 1 and len(sent) == 1

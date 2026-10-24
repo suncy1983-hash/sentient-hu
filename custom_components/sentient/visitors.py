@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.const import EVENT_STATE_CHANGED, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
@@ -43,6 +44,7 @@ from .const import (
 )
 from . import i18n
 from .i18n import t
+from .memory import _fold
 from .watches import local_when
 
 if TYPE_CHECKING:
@@ -59,7 +61,10 @@ DOORSTEP_SETTLE = 10  # seconds after a doorstep visit ends, so the visitor has 
 DOORSTEP_COOLDOWN = timedelta(minutes=2)
 RANG_RECENTLY = timedelta(minutes=5)  # a doorbell visit already does its own parcel check
 FACE_FRESH = timedelta(minutes=2)
-_NO_NAME = {"", "none", "unknown", "unavailable", "no face", "no_face", "nobody", "null"}
+_NO_NAME = {"", "none", "unknown", "unavailable", "no face", "no_face", "nobody", "null",
+            "stranger", "unknown person", "unrecognized", "unrecognised", "ismeretlen", "idegen"}
+_FACE_WORDS = ("face", "last_person", "recogni")
+HOUSEHOLD_MOVING = timedelta(minutes=3)
 KINDS = ["delivery", "visitor", "neighbour", "child", "unknown", "nobody"]
 
 
@@ -102,6 +107,48 @@ class Visitors:
     def camera(self) -> str | None:
         return self.options.get(CONF_DOOR_CAMERA)
 
+    def _device_entities(self, entity_id: str | None, domain: str) -> list[str]:
+        """Entities of one domain on the same device as entity_id."""
+        if not entity_id:
+            return []
+        reg = er.async_get(self.hass)
+        entry = reg.async_get(entity_id)
+        if entry is None or not entry.device_id:
+            return []
+        return sorted(
+            e.entity_id for e in er.async_entries_for_device(reg, entry.device_id)
+            if e.domain == domain and not e.disabled_by
+        )
+
+    def camera_for(self, trigger: str | None) -> str | None:
+        """The camera on the trigger's own device (a gate camera's person sensor looks through
+        the gate camera), else the configured door camera."""
+        own = self._device_entities(trigger, "camera")
+        return own[0] if own else self.camera
+
+    def place_for(self, camera: str | None) -> str | None:
+        """A name for where a camera looks, when it isn't the main door camera."""
+        if not camera or camera == self.camera:
+            return None
+        st = self.hass.states.get(camera)
+        return st.name if st else None
+
+    def is_household(self, name: str | None) -> bool:
+        """Whether a recognised name is one of the people who live here (HA person entities)."""
+        if not name:
+            return False
+        wanted = _fold(name)
+        for st in self.hass.states.async_all("person"):
+            names = {_fold(st.name), _fold(st.entity_id.split(".", 1)[1].replace("_", " "))}
+            if wanted in names or wanted.split(" ")[0] in {n.split(" ")[0] for n in names if n}:
+                return True
+        return False
+
+    def household_moving(self) -> bool:
+        """Someone who lives here has just arrived or left — the camera most likely saw them."""
+        now = dt_util.utcnow()
+        return any(now - st.last_changed < HOUSEHOLD_MOVING for st in self.hass.states.async_all("person"))
+
     @property
     def triggers(self) -> set[str]:
         return set(self.options.get(CONF_DOOR_TRIGGERS) or [])
@@ -125,30 +172,43 @@ class Visitors:
             out.append(line)
         return out
 
-    def recognised_name(self) -> str | None:
-        """A name from the face-recognition sensor, if one appeared just now."""
-        entity_id = self.options.get(CONF_FACE_SENSOR)
-        st = self.hass.states.get(entity_id) if entity_id else None
-        if st is None or st.state.strip().lower() in _NO_NAME:
-            return None
-        if dt_util.utcnow() - st.last_changed > FACE_FRESH:
-            return None
-        return st.state.strip().replace("_", " ").title()
+    def recognised_name(self, trigger: str | None = None) -> str | None:
+        """A name from a face-recognition sensor, if one appeared just now: a face/person-name
+        sensor on the trigger's own device first, then the configured one."""
+        candidates = [
+            e for e in self._device_entities(trigger, "sensor")
+            if any(word in e.split(".", 1)[1] for word in _FACE_WORDS)
+        ]
+        if configured := self.options.get(CONF_FACE_SENSOR):
+            candidates.append(configured)
+        for entity_id in candidates:
+            st = self.hass.states.get(entity_id)
+            if st is None or st.state.strip().lower() in _NO_NAME:
+                continue
+            if dt_util.utcnow() - st.last_changed > FACE_FRESH:
+                continue
+            try:
+                float(st.state)
+                continue  # a count or a score, not a name
+            except ValueError:
+                pass
+            return st.state.strip().replace("_", " ").title()
+        return None
 
     # ----- trigger -------------------------------------------------------------
     @callback
     def _on_state_changed(self, event: Event[EventStateChangedData]) -> None:
         new = event.data["new_state"]
-        if new is None or not self.camera:
+        if new is None or (new.entity_id not in self.doorstep and new.entity_id not in self.triggers):
             return
         old = event.data["old_state"]
         if new.state in (STATE_UNAVAILABLE, STATE_UNKNOWN) or old is None or old.state == STATE_UNAVAILABLE:
             return
         if new.entity_id in self.doorstep:
-            if old.state == STATE_ON and new.state != STATE_ON:
+            if self.camera and old.state == STATE_ON and new.state != STATE_ON:
                 self._doorstep_visit_ended()
             return
-        if new.entity_id not in self.triggers:
+        if not self.camera_for(new.entity_id):
             return
         if new.domain == "event":
             fired = old.state != new.state  # event entities change state to the time they fired
@@ -226,13 +286,13 @@ class Visitors:
         return there
 
     # ----- looking ---------------------------------------------------------------
-    async def _look(self, task: str, instructions: str, structure: dict) -> dict[str, Any]:
+    async def _look(self, task: str, instructions: str, structure: dict, camera: str | None = None) -> dict[str, Any]:
         data: dict[str, Any] = {
             "task_name": task,
             "instructions": instructions + i18n.write_in(),
             "structure": structure,
             "attachments": [
-                {"media_content_id": f"media-source://camera/{self.camera}", "media_content_type": "image/jpeg"}
+                {"media_content_id": f"media-source://camera/{camera or self.camera}", "media_content_type": "image/jpeg"}
             ],
         }
         if ai_entity := ai_task_entity(self.hass, self.options):
@@ -249,15 +309,18 @@ class Visitors:
         if not self.watches.spend():
             _LOGGER.debug("Visitor not described: daily AI limit reached")
             return None
+        camera = self.camera_for(trigger)
+        place = self.place_for(camera)
         self._busy = True
         try:
             await asyncio.sleep(1)
             result = await self._look(
                 "Sentient: who's at the door",
-                "This is a doorbell camera picture taken as the bell rang. Describe who is at the door "
-                "in a few plain words (e.g. 'a delivery driver holding a small parcel', 'a man in a "
-                "red coat', 'two children'). Don't guess names. Set kind to the best match, and parcel "
-                "to true if they are carrying or have put down a parcel or package.",
+                "This is a camera picture at the door or gate, taken as someone rang or was seen there. "
+                "Describe who is there in a few plain words (e.g. 'a delivery driver holding a small "
+                "parcel', 'a man in a red coat', 'two children'). Don't guess names. Set kind to the best "
+                "match (nobody if no one is visible), and parcel to true if they are carrying or have put "
+                "down a parcel or package.",
                 {
                     "kind": {"description": "Best match", "required": True,
                              "selector": {"select": {"options": KINDS}}},
@@ -266,6 +329,7 @@ class Visitors:
                     "parcel": {"description": "Carrying or put down a parcel", "required": False,
                                "selector": {"boolean": {}}},
                 },
+                camera,
             )
         except HomeAssistantError as err:
             _LOGGER.warning("Sentient could not look at the door: %s", err)
@@ -273,7 +337,8 @@ class Visitors:
         finally:
             self._busy = False
         kind = result.get("kind") if result.get("kind") in KINDS else "unknown"
-        name = self.recognised_name()
+        name = self.recognised_name(trigger)
+        household = self.is_household(name) or (not name and self.household_moving())
         visit = {
             "name": name,
             "time": dt_util.now().isoformat(),
@@ -282,31 +347,40 @@ class Visitors:
             "parcel": bool(result.get("parcel")),
             "parcel_left": False,
             "trigger": trigger,
+            "place": place,
+            "household": household,
         }
         self.log.appendleft(visit)
         self._save()
+        if household:
+            return visit  # logged, but nobody needs telling that they themselves came home
         if self.options.get(CONF_ANNOUNCE_VISITORS, DEFAULT_ANNOUNCE_VISITORS) and kind != "nobody":
-            line = (t("visitors.named_at_door", name=name) if name
-                    else t("visitors.someone_at_door", description=visit["description"]))
+            if place:
+                line = (t("visitors.named_at_place", name=name, place=place) if name
+                        else t("visitors.someone_at_place", description=visit["description"], place=place))
+            else:
+                line = (t("visitors.named_at_door", name=name) if name
+                        else t("visitors.someone_at_door", description=visit["description"]))
             await self.speech.async_say(line, "normal", None, source="visitors")
         if (kind == "delivery" or visit["parcel"]) and self.options.get(CONF_PARCEL_ALERTS, DEFAULT_PARCEL_ALERTS):
             @callback
             def _recheck(_now: datetime) -> None:
-                self.hass.async_create_task(self._async_parcel_check(visit))
+                self.hass.async_create_task(self._async_parcel_check(visit, camera))
 
             async_call_later(self.hass, PARCEL_RECHECK, _recheck)
         return visit
 
-    async def _async_parcel_check(self, visit: dict[str, Any]) -> None:
+    async def _async_parcel_check(self, visit: dict[str, Any], camera: str | None = None) -> None:
         if not self.watches.spend():
             return
         try:
             result = await self._look(
                 "Sentient: parcel left?",
-                "This is the doorstep a few minutes after a delivery. Is a parcel, package or bag left "
-                "on the doorstep or by the door?",
+                "This is the doorstep or gate a few minutes after a delivery. Is a parcel, package or bag "
+                "left there, on the doorstep or by the door or gate?",
                 {"parcel_left": {"description": "True if a parcel is visibly left", "required": True,
                                  "selector": {"boolean": {}}}},
+                camera,
             )
         except HomeAssistantError as err:
             _LOGGER.warning("Sentient could not check for a parcel: %s", err)
