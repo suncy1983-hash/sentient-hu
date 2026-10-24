@@ -22,8 +22,11 @@ if TYPE_CHECKING:
     from .semantic import SemanticIndex
 
 # Semantic recall (multilingual-e5 cosines run high: unrelated ~0.75, related ~0.85+).
-SEMANTIC_MIN = 0.80  # nothing below this counts as related
-SEMANTIC_SPREAD = 0.06  # and nothing much further from the best match than this
+# Measured with Hungarian household memories on the house's NUC: with e5-base unrelated ones score
+# 0.74-0.79 and the right one 0.78-0.86; e5-small runs about 0.03 higher across the board.
+SEMANTIC_MIN = {"multilingual-e5-base": 0.765, "multilingual-e5-small": 0.795}
+SEMANTIC_MIN_DEFAULT = 0.78  # nothing below this counts as related
+SEMANTIC_SPREAD = 0.05  # and nothing much further from the best match than this
 KEYWORD_BONUS = 0.02  # a shared word nudges an equally close memory up
 
 from .const import (  # noqa: E402
@@ -216,7 +219,8 @@ class MemoryStore:
             return self.search(query, limit, count_hits)
         words = self._keyword_scores(query)
         best = max(meaning.values())
-        floor = max(SEMANTIC_MIN, best - SEMANTIC_SPREAD)
+        minimum = SEMANTIC_MIN.get(self.semantic.model, SEMANTIC_MIN_DEFAULT)
+        floor = max(minimum, best - SEMANTIC_SPREAD)
         scored: list[tuple[float, Memory]] = []
         for m in self._items:
             cos, kw = meaning.get(m.id), words.get(m.id, 0.0)
