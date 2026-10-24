@@ -35,6 +35,7 @@ from .const import (
     CONF_SECOND_OPINION,
     CONF_NOTIFY_TARGETS,
     CONF_CHIME,
+    CONF_EMBED_URL,
     CONF_VOICE_ID_URL,
     CONF_VOICE_STT_BASE,
     CONF_DIGEST_TIME,
@@ -105,6 +106,9 @@ GROUPS: list[tuple[str, str, str, str, list[str]]] = [
     ]),
     ("voices", "Voice recognition", "mdi:account-voice", "Who is speaking: the Voice ID app and the speech-to-text it sits on.", [
         CONF_VOICE_STT_BASE, CONF_VOICE_ID_URL,
+    ]),
+    ("memory", "Memory", "mdi:brain", "Finding memories by meaning, not just by matching words.", [
+        CONF_EMBED_URL,
     ]),
     ("quiet", "Quiet & rooms", "mdi:weather-night", "When to keep it down and how rooms are worked out.", [
         CONF_QUIET_START, CONF_QUIET_END, CONF_MOTION_WINDOW, CONF_PASS_THROUGH_AREAS,

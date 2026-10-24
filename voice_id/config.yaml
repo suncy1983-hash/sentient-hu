@@ -1,7 +1,7 @@
 name: Sentient Voice ID
-version: "0.1.1"
+version: "0.2.0"
 slug: sentient_voice_id
-description: Recognises who in the house is speaking — locally — for the Sentient integration.
+description: Recognises who is speaking, and finds memories by meaning — locally — for the Sentient integration.
 url: https://github.com/suncy1983-hash/sentient-hu
 arch:
   - amd64

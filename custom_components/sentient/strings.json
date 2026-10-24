@@ -46,7 +46,8 @@
           "second_opinion_ai": "Second opinion AI",
           "chime": "Chime before speaking",
           "voice_stt_base": "Speech-to-text behind voice recognition",
-          "voice_id_url": "Voice ID app address"
+          "voice_id_url": "Voice ID app address",
+          "embed_url": "Semantic memory address"
         },
         "data_description": {
           "motion_window": "How many minutes of motion history to weigh up when deciding where people are.",
@@ -74,7 +75,8 @@
           "chat_agent": "Who answers the page's Ask box — pick a voice agent that has Sentient ticked. Empty uses your preferred Assist pipeline.",
           "health_ignore": "Entities (and their devices) that shouldn't count as problems, e.g. something that's meant to be off.",
           "voice_stt_base": "Sentient's voice STT passes the audio on to this one for the words (e.g. Home Assistant Cloud). Leave empty to use the first other one.",
-          "voice_id_url": "Where the Sentient Voice ID app listens, e.g. http://xxxxxxxx-sentient-voice-id:8765. Empty turns voice recognition off."
+          "voice_id_url": "Where the Sentient Voice ID app listens, e.g. http://xxxxxxxx-sentient-voice-id:8765. Empty turns voice recognition off.",
+          "embed_url": "Where the Sentient app's text model listens (the same app as Voice ID). Empty uses the Voice ID address; with neither, memories are found by keywords only."
         }
       }
     },
@@ -156,7 +158,8 @@
           "warm_by_weekdays": "Warm by (weekdays)",
           "warm_by_weekends": "Warm by (weekends)",
           "voice_stt_base": "Speech-to-text behind voice recognition",
-          "voice_id_url": "Voice ID app address"
+          "voice_id_url": "Voice ID app address",
+          "embed_url": "Semantic memory address"
         },
         "data_description": {
           "motion_window": "How many minutes of motion history to weigh up when deciding where people are.",
@@ -210,7 +213,8 @@
           "warm_by_weekdays": "Optional: when it should be warm on weekdays. Leave empty to use the learned getting-up time.",
           "warm_by_weekends": "Optional: the same for Saturdays and Sundays.",
           "voice_stt_base": "Sentient's voice STT passes the audio on to this one for the words (e.g. Home Assistant Cloud). Leave empty to use the first other one.",
-          "voice_id_url": "Where the Sentient Voice ID app listens, e.g. http://xxxxxxxx-sentient-voice-id:8765. Empty turns voice recognition off."
+          "voice_id_url": "Where the Sentient Voice ID app listens, e.g. http://xxxxxxxx-sentient-voice-id:8765. Empty turns voice recognition off.",
+          "embed_url": "Where the Sentient app's text model listens (the same app as Voice ID). Empty uses the Voice ID address; with neither, memories are found by keywords only."
         }
       },
       "memories": {

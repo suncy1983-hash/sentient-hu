@@ -71,6 +71,26 @@ async def test_enrol_identify_and_forget(tmp_path, socket_enabled) -> None:
     assert [p.name for p in tmp_path.iterdir()] == ["voices.json"]
 
 
+async def test_embed_endpoint(tmp_path, socket_enabled) -> None:
+    seen = []
+
+    def embed_texts(texts, kind):
+        seen.append(kind)
+        return np.array([[1.0, 0.0] for _ in texts])
+
+    svc = server.Service(server.Voices(tmp_path), _embed, server.Meaning(embed_texts))
+    async with TestClient(TestServer(svc.app())) as client:
+        res = await (await client.post("/embed", json={"texts": ["a kút", "kávé"], "kind": "query"})).json()
+        assert res["model"] == "multilingual-e5-small" and res["vectors"] == [[1.0, 0.0], [1.0, 0.0]]
+        assert (await (await client.post("/embed", json={"texts": []})).json())["vectors"] == []
+        assert (await client.post("/embed", data=b"nope")).status == 400
+    assert seen == ["query"]
+
+    # without a text model the endpoint isn't there, and voices still work
+    async with TestClient(TestServer(server.Service(server.Voices(tmp_path), _embed).app())) as client:
+        assert (await client.post("/embed", json={"texts": ["x"]})).status == 404
+
+
 def test_silence_is_trimmed() -> None:
     x = np.concatenate([np.zeros(16000), np.ones(8000) * 0.3, np.zeros(16000)]).astype(np.float32)
     assert 8000 <= len(server.trim(x)) <= 8000 + 2 * 1600

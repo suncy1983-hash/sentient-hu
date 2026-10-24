@@ -92,8 +92,9 @@ class RecallTool(_Tool):
     annotations = _read_only()
     name = "sentient_recall"
     description = (
-        "Search the house's long-term memory. Use before answering questions about "
-        "the household's people, preferences, routines or anything you were told earlier."
+        "Search the house's long-term memory — by meaning, so describe what you're looking for in a few words. "
+        "Use before answering questions about the household's people, preferences, routines, stories being told "
+        "or anything you were told earlier."
     )
     parameters = vol.Schema({vol.Required("query"): cv.string})
 
@@ -103,13 +104,16 @@ class RecallTool(_Tool):
         rt = _runtime(hass)
         if rt is None:
             return {"error": "Sentient is not loaded"}
-        found = rt.memory.search(tool_input.tool_args["query"])
+        found = await rt.memory.async_search(tool_input.tool_args["query"])
         return {"memories": [{"id": m.id, "text": m.text, "category": m.category} for m in found]}
 
 
 class ForgetTool(_Tool):
     name = "sentient_forget"
-    description = "Remove something from the house's long-term memory when asked to forget it."
+    description = (
+        "Remove something from the house's long-term memory when asked to forget it. Pass its id (from "
+        "sentient_recall) or its words; if it isn't clear which memory is meant, you get the closest few back to ask about."
+    )
     parameters = vol.Schema({vol.Required("what"): cv.string})
 
     async def async_call(
@@ -118,7 +122,10 @@ class ForgetTool(_Tool):
         rt = _runtime(hass)
         if rt is None:
             return {"error": "Sentient is not loaded"}
-        removed = rt.memory.forget(tool_input.tool_args["what"])
+        removed, closest = await rt.memory.async_forget(tool_input.tool_args["what"])
+        if removed is None and closest:
+            return {"forgotten": None, "not_sure_which": [{"id": m.id, "text": m.text} for m in closest],
+                    "hint": "Ask which one, then call again with its id."}
         return {"forgotten": removed.text if removed else None}
 
 

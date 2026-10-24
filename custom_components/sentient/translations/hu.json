@@ -46,7 +46,8 @@
           "second_opinion_ai": "Második vélemény AI",
           "chime": "Csengőhang beszéd előtt",
           "voice_stt_base": "A hangfelismerés mögötti beszédfelismerő",
-          "voice_id_url": "A Voice ID app címe"
+          "voice_id_url": "A Voice ID app címe",
+          "embed_url": "A szemantikus memória címe"
         },
         "data_description": {
           "motion_window": "Hány perc mozgáselőzményt vegyen figyelembe, amikor eldönti, hol vannak az emberek.",
@@ -74,7 +75,8 @@
           "chat_agent": "Ki válaszol az oldal Kérdés mezőjére – válassz egy hangagentet, amelyiknél be van pipálva a Sentient. Üresen az alapértelmezett Assist folyamatot használja.",
           "health_ignore": "Entitások (és eszközeik), amelyek nem számítanak hibának, pl. valami, aminek ki kell lennie kapcsolva.",
           "voice_stt_base": "A Sentient hang-STT-je ennek adja tovább a hangot a szövegért (pl. Home Assistant Cloud). Üresen az első másikat használja.",
-          "voice_id_url": "Ahol a Sentient Voice ID app figyel, pl. http://xxxxxxxx-sentient-voice-id:8765. Üresen a hangfelismerés ki van kapcsolva."
+          "voice_id_url": "Ahol a Sentient Voice ID app figyel, pl. http://xxxxxxxx-sentient-voice-id:8765. Üresen a hangfelismerés ki van kapcsolva.",
+          "embed_url": "Ahol a Sentient app szövegmodellje figyel (ugyanaz az app, mint a Voice ID). Üresen a Voice ID címét használja; ha az sincs, csak kulcsszó alapján keres."
         }
       }
     },
@@ -156,7 +158,8 @@
           "warm_by_weekdays": "Meleg legyen ekkorra (hétköznap)",
           "warm_by_weekends": "Meleg legyen ekkorra (hétvégén)",
           "voice_stt_base": "A hangfelismerés mögötti beszédfelismerő",
-          "voice_id_url": "A Voice ID app címe"
+          "voice_id_url": "A Voice ID app címe",
+          "embed_url": "A szemantikus memória címe"
         },
         "data_description": {
           "motion_window": "Hány perc mozgáselőzményt vegyen figyelembe, amikor eldönti, hol vannak az emberek.",
@@ -210,7 +213,8 @@
           "warm_by_weekdays": "Opcionális: hétköznap mikorra legyen meleg. Üresen a tanult felkelési időt használja.",
           "warm_by_weekends": "Opcionális: ugyanez szombatra és vasárnapra.",
           "voice_stt_base": "A Sentient hang-STT-je ennek adja tovább a hangot a szövegért (pl. Home Assistant Cloud). Üresen az első másikat használja.",
-          "voice_id_url": "Ahol a Sentient Voice ID app figyel, pl. http://xxxxxxxx-sentient-voice-id:8765. Üresen a hangfelismerés ki van kapcsolva."
+          "voice_id_url": "Ahol a Sentient Voice ID app figyel, pl. http://xxxxxxxx-sentient-voice-id:8765. Üresen a hangfelismerés ki van kapcsolva.",
+          "embed_url": "Ahol a Sentient app szövegmodellje figyel (ugyanaz az app, mint a Voice ID). Üresen a Voice ID címét használja; ha az sincs, csak kulcsszó alapján keres."
         }
       },
       "memories": {

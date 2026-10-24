@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import unicodedata
 import uuid
 
@@ -18,7 +18,15 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import (
+if TYPE_CHECKING:
+    from .semantic import SemanticIndex
+
+# Semantic recall (multilingual-e5 cosines run high: unrelated ~0.75, related ~0.85+).
+SEMANTIC_MIN = 0.80  # nothing below this counts as related
+SEMANTIC_SPREAD = 0.06  # and nothing much further from the best match than this
+KEYWORD_BONUS = 0.02  # a shared word nudges an equally close memory up
+
+from .const import (  # noqa: E402
     DOMAIN,
     EVENT_MEMORY_CHANGED,
     MEMORY_CATEGORIES,
@@ -99,6 +107,7 @@ class MemoryStore:
             hass, MEMORY_STORAGE_VERSION, f"{DOMAIN}.{entry_id}.memory"
         )
         self._items: list[Memory] = []
+        self.semantic: SemanticIndex | None = None
 
     async def async_load(self) -> None:
         data = await self._store.async_load() or {}
@@ -168,26 +177,69 @@ class MemoryStore:
             self._save()
         return target
 
-    def search(self, query: str, limit: int = 8, count_hits: bool = True) -> list[Memory]:
-        """Keyword-ranked recall. Good enough for hundreds of short facts."""
+    def _keyword_scores(self, query: str) -> dict[str, float]:
         q = _words(query)
-        if not q:
-            return self.recent(limit)
-        scored: list[tuple[float, Memory]] = []
+        scores: dict[str, float] = {}
         for memory in self._items:
             words = _words(memory.text)
             score = len(q & words)
             # partial matches (rabbit / rabbits, nyúl / nyulakat / nyúlketrec)
             score += 0.5 * sum(1 for a in q for b in words if _related(a, b))
             if score:
-                scored.append((score, memory))
-        scored.sort(key=lambda s: (s[0], s[1].created), reverse=True)
-        result = [m for _, m in scored[:limit]]
+                scores[memory.id] = score
+        return scores
+
+    def _count(self, result: list[Memory], count_hits: bool) -> list[Memory]:
         if count_hits and result:
             for m in result:
                 m.hits += 1
             self._save()
         return result
+
+    def search(self, query: str, limit: int = 8, count_hits: bool = True) -> list[Memory]:
+        """Keyword-ranked recall. Good enough for hundreds of short facts."""
+        if not _words(query):
+            return self.recent(limit)
+        scores = self._keyword_scores(query)
+        ranked = sorted((m for m in self._items if m.id in scores), key=lambda m: (scores[m.id], m.created), reverse=True)
+        return self._count(ranked[:limit], count_hits)
+
+    async def async_search(self, query: str, limit: int = 8, count_hits: bool = True) -> list[Memory]:
+        """Recall by meaning and words together; keywords alone if the text model isn't available.
+
+        "Mit eszik a kutya?" finds "Bodri csak a száraz tápot szereti" though no word is shared.
+        """
+        if not query.strip():
+            return self.recent(limit)
+        meaning = await self.semantic.async_rank(query) if self.semantic is not None else None
+        if not meaning:
+            return self.search(query, limit, count_hits)
+        words = self._keyword_scores(query)
+        best = max(meaning.values())
+        floor = max(SEMANTIC_MIN, best - SEMANTIC_SPREAD)
+        scored: list[tuple[float, Memory]] = []
+        for m in self._items:
+            cos, kw = meaning.get(m.id), words.get(m.id, 0.0)
+            if (cos is not None and cos >= floor) or kw:
+                scored.append(((cos if cos is not None else floor) + KEYWORD_BONUS * min(kw, 3), m))
+        scored.sort(key=lambda s: (s[0], s[1].created), reverse=True)
+        return self._count([m for _, m in scored[:limit]], count_hits)
+
+    async def async_forget(self, memory_id_or_text: str) -> tuple[Memory | None, list[Memory]]:
+        """Forget by id, or by a match close enough to be sure; otherwise return the closest few to ask about."""
+        target = self.get(memory_id_or_text)
+        if target is None:
+            found = await self.async_search(memory_id_or_text, limit=3, count_hits=False)
+            kw = self._keyword_scores(memory_id_or_text)
+            top = kw.get(found[0].id, 0) if found else 0
+            second = kw.get(found[1].id, 0) if len(found) > 1 else 0
+            sure = bool(found) and (len(found) == 1 or (top >= 2 and top > second))
+            if not sure:
+                return None, found
+            target = found[0]
+        self._items.remove(target)
+        self._save()
+        return target, []
 
     def recent(self, limit: int) -> list[Memory]:
         return sorted(self._items, key=lambda m: (m.hits, m.created), reverse=True)[:limit]

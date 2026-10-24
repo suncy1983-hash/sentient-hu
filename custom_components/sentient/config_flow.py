@@ -63,6 +63,7 @@ from .const import (
     CONF_SECOND_OPINION,
     CONF_NOTIFY_TARGETS,
     CONF_CHIME,
+    CONF_EMBED_URL,
     CONF_VOICE_ID_URL,
     CONF_VOICE_STT_BASE,
     CONF_DIGEST_TIME,
@@ -133,6 +134,7 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
                 selector.EntitySelectorConfig(domain="stt")
             ),
             vol.Optional(CONF_VOICE_ID_URL, **d(CONF_VOICE_ID_URL)): selector.TextSelector(),
+            vol.Optional(CONF_EMBED_URL, **d(CONF_EMBED_URL)): selector.TextSelector(),
             vol.Optional(CONF_SPEAK_VOLUME, **d(CONF_SPEAK_VOLUME)): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=5, max=100, step=5, unit_of_measurement="%", mode=selector.NumberSelectorMode.SLIDER)
             ),

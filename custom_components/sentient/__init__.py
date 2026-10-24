@@ -61,6 +61,7 @@ from .nightwatch import NightWatch
 from .watches import WatchManager
 from .speech import SpeechRouter
 from .voice import VoiceID
+from .semantic import Embedder, SemanticIndex
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -189,6 +190,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
     options = _entry_options(entry)
     memory = MemoryStore(hass, entry.entry_id)
     await memory.async_load()
+    embedder = Embedder(hass, options)
+    memory.semantic = SemanticIndex(hass, entry.entry_id, embedder, lambda: memory.items)
+    await memory.semantic.async_load()
+    memory.semantic.async_start()
+    entry.async_on_unload(memory.semantic.async_stop)
     timeline = Timeline(hass, entry.entry_id)
     await timeline.async_start()
     entry.async_on_unload(timeline.async_stop)
@@ -306,6 +312,9 @@ async def _async_options_updated(hass: HomeAssistant, entry: SentientConfigEntry
     entry.runtime_data.notifier.options = options
     entry.runtime_data.welcome.options = options
     entry.runtime_data.voice.options = options
+    if (semantic := entry.runtime_data.memory.semantic) is not None:
+        semantic.embedder.options = options
+        semantic.schedule()
     entry.runtime_data.critical.options = options
     entry.runtime_data.left_open.options = options
     entry.runtime_data.heating.options = options

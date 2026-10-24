@@ -1237,6 +1237,7 @@ select{background:#0d1626;border:1px solid rgba(0,255,247,.3);border-radius:8px;
     "after dark": "sötétedés után", "Lights that follow movement": "Mozgást követő lámpák",
     "Backup": "Mentés", "Download or restore everything": "Minden letöltése vagy visszaállítása",
     "Voice": "Hang", "Name, speakers and how it talks.": "Név, hangszórók és beszédmód.",
+    "Memory": "Memória", "Finding memories by meaning, not just by matching words.": "Emlékek keresése jelentés alapján, nem csak egyező szavakra.",
     "Voice recognition": "Hangfelismerés", "Who is speaking: the Voice ID app and the speech-to-text it sits on.": "Ki beszél: a Voice ID app és a mögötte lévő beszédfelismerő.",
     "Quiet & rooms": "Csend és szobák", "When to keep it down and how rooms are worked out.": "Mikor legyen halk, és hogyan dönti el, melyik szobában szóljon.",
     "Briefings": "Összefoglalók", "What a briefing covers and when.": "Mi kerüljön az összefoglalóba, és mikor.",

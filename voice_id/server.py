@@ -35,6 +35,7 @@ _LOGGER = logging.getLogger("voice_id")
 
 DATA = Path(os.environ.get("VOICE_ID_DATA", "/data"))
 MODEL = os.environ.get("VOICE_ID_MODEL", "/models/wespeaker.onnx")
+TEXT_MODEL = os.environ.get("VOICE_ID_TEXT_MODEL", "/models/e5")
 RATE = 16000
 MIN_SECONDS = 0.6
 MAX_ENROLLED = 40
@@ -165,8 +166,8 @@ class Voices:
 
 # ----- web ----------------------------------------------------------------------------------
 class Service:
-    def __init__(self, voices: Voices, embed) -> None:
-        self.voices, self.embed = voices, embed
+    def __init__(self, voices: Voices, embed, meaning: "Meaning | None" = None) -> None:
+        self.voices, self.embed, self.meaning = voices, embed, meaning
         self._lock = asyncio.Lock()  # one embedding at a time keeps a small box responsive
 
     async def _print(self, request: web.Request) -> np.ndarray:
@@ -219,7 +220,76 @@ class Service:
             web.get("/people", self.people),
             web.delete("/people/{name}", self.forget),
         ])
+        if self.meaning is not None:
+            app.add_routes([web.post("/embed", self.meaning.embed)])
         return app
+
+
+class TextModel:
+    """multilingual-e5-small: sentences in any language (Hungarian included) to 384 numbers for meaning.
+
+    Loaded on first use. e5 wants "query: " in front of what is searched for and "passage: " in front of
+    what is searched in; vectors are the mean over tokens, normalised.
+    """
+
+    def __init__(self, folder: str) -> None:
+        self.folder = Path(folder)
+        self._session = None
+        self._tokenizer = None
+        self._inputs: list[str] = []
+
+    def _load(self) -> None:
+        import onnxruntime as ort  # noqa: PLC0415
+        from tokenizers import Tokenizer  # noqa: PLC0415
+
+        options = ort.SessionOptions()
+        options.intra_op_num_threads = 2
+        self._session = ort.InferenceSession(str(self.folder / "model.onnx"), options, providers=["CPUExecutionProvider"])
+        self._inputs = [i.name for i in self._session.get_inputs()]
+        tok = Tokenizer.from_file(str(self.folder / "tokenizer.json"))
+        tok.enable_truncation(max_length=256)
+        tok.enable_padding(pad_id=tok.token_to_id("<pad>") or 1, pad_token="<pad>")
+        self._tokenizer = tok
+        _LOGGER.info("Text model loaded (%s)", ", ".join(self._inputs))
+
+    def __call__(self, texts: list[str], kind: str) -> np.ndarray:
+        if self._session is None:
+            self._load()
+        prefix = "query: " if kind == "query" else "passage: "
+        enc = self._tokenizer.encode_batch([prefix + t for t in texts])
+        ids = np.array([e.ids for e in enc], dtype=np.int64)
+        mask = np.array([e.attention_mask for e in enc], dtype=np.int64)
+        feeds = {"input_ids": ids, "attention_mask": mask}
+        if "token_type_ids" in self._inputs:
+            feeds["token_type_ids"] = np.zeros_like(ids)
+        hidden = self._session.run(None, {k: v for k, v in feeds.items() if k in self._inputs})[0]
+        m = mask[..., None].astype(np.float32)
+        vecs = (hidden * m).sum(axis=1) / np.maximum(m.sum(axis=1), 1e-9)
+        return vecs / np.maximum(np.linalg.norm(vecs, axis=1, keepdims=True), 1e-9)
+
+
+class Meaning:
+    """POST /embed {"texts": [...], "kind": "query"|"passage"} -> {"model": ..., "vectors": [[...], ...]}"""
+
+    MODEL_ID = "multilingual-e5-small"
+    MAX_TEXTS = 64
+
+    def __init__(self, embed_texts) -> None:
+        self.embed_texts = embed_texts
+        self._lock = asyncio.Lock()
+
+    async def embed(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+        except ValueError as err:
+            raise web.HTTPBadRequest(text="JSON needed") from err
+        texts = [str(t) for t in data.get("texts") or []][: self.MAX_TEXTS]
+        kind = "query" if data.get("kind") == "query" else "passage"
+        if not texts:
+            return web.json_response({"model": self.MODEL_ID, "vectors": []})
+        async with self._lock:
+            vecs = await asyncio.get_running_loop().run_in_executor(None, self.embed_texts, texts, kind)
+        return web.json_response({"model": self.MODEL_ID, "vectors": [[round(float(f), 5) for f in v] for v in vecs]})
 
 
 def make_embedder(model: str):
@@ -248,8 +318,11 @@ def main() -> None:
                     bool(options.get("learn", True)))
     _LOGGER.info("Voice ID ready: %d voices, threshold %.2f, margin %.2f", len(voices.people),
                  voices.threshold, voices.margin)
-    web.run_app(Service(voices, make_embedder(MODEL)).app(), port=int(os.environ.get("VOICE_ID_PORT", "8765")),
-                print=None)
+    meaning = Meaning(TextModel(TEXT_MODEL)) if Path(TEXT_MODEL, "model.onnx").exists() else None
+    if meaning is None:
+        _LOGGER.warning("No text model in %s: semantic memory is off", TEXT_MODEL)
+    web.run_app(Service(voices, make_embedder(MODEL), meaning).app(),
+                port=int(os.environ.get("VOICE_ID_PORT", "8765")), print=None)
 
 
 if __name__ == "__main__":
