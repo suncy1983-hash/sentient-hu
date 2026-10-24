@@ -215,3 +215,24 @@ async def test_household_is_logged_but_not_announced_or_notified(hass: HomeAssis
         hass.states.async_set("binary_sensor.kapu_person", "on")
         await hass.async_block_till_done()
     assert len(said) == 1 and len(sent) == 1
+
+
+async def test_battery_camera_uses_the_fresh_event_snapshot(hass: HomeAssistant) -> None:
+    from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+    await _setup(hass, parcel_alerts=False, door_triggers=["binary_sensor.kapu_person"])
+    _gate_device(hass)
+    reg = er.async_get(hass)
+    cam = reg.async_get("camera.kapu")
+    owner = hass.config_entries.async_get_entry(cam.config_entry_id)
+    reg.async_get_or_create("image", "eufy_test", "last", suggested_object_id="kapu_last_event",
+                            config_entry=owner, device_id=cam.device_id)
+    assert dr.async_get(hass).async_get(cam.device_id)
+    hass.states.async_set("image.kapu_last_event", "unknown")
+    await hass.async_block_till_done()
+    ai = _ai(hass, [{"kind": "visitor", "description": "A postman"}])
+    with patch("custom_components.sentient.visitors.asyncio.sleep"):
+        hass.states.async_set("image.kapu_last_event", "2026-10-24T15:20:00+00:00")
+        hass.states.async_set("binary_sensor.kapu_person", "on")
+        await hass.async_block_till_done()
+    assert ai[0].data["attachments"][0]["media_content_id"] == "media-source://image/image.kapu_last_event"

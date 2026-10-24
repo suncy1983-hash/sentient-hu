@@ -65,7 +65,15 @@ _NO_NAME = {"", "none", "unknown", "unavailable", "no face", "no_face", "nobody"
             "stranger", "unknown person", "unrecognized", "unrecognised", "ismeretlen", "idegen"}
 _FACE_WORDS = ("face", "last_person", "recogni")
 HOUSEHOLD_MOVING = timedelta(minutes=3)
+EVENT_IMAGE_WAIT = 20  # seconds to wait for a battery camera's event snapshot
+EVENT_IMAGE_SLACK = timedelta(seconds=10)
 KINDS = ["delivery", "visitor", "neighbour", "child", "unknown", "nobody"]
+
+
+def _media_id(entity_id: str | None) -> str:
+    """A camera's live still or an image entity, as a media source."""
+    domain = (entity_id or "camera.").split(".", 1)[0]
+    return f"media-source://{'image' if domain == 'image' else 'camera'}/{entity_id}"
 
 
 class Visitors:
@@ -125,6 +133,23 @@ class Visitors:
         the gate camera), else the configured door camera."""
         own = self._device_entities(trigger, "camera")
         return own[0] if own else self.camera
+
+    async def picture_for(self, trigger: str | None, camera: str | None) -> str | None:
+        """What to look at for a visit. Battery cameras (eufy and the like) often have no live
+        still while asleep, but their integration publishes an event snapshot as an image entity
+        on the same device moments after a detection: wait briefly for that, else use the camera."""
+        images = sorted(self._device_entities(trigger, "image"), key=lambda e: "event" not in e)
+        if not images:
+            await asyncio.sleep(1)
+            return camera
+        start = dt_util.utcnow() - EVENT_IMAGE_SLACK
+        for _ in range(EVENT_IMAGE_WAIT):
+            for image in images:
+                st = self.hass.states.get(image)
+                if st and st.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE) and st.last_changed >= start:
+                    return image
+            await asyncio.sleep(1)
+        return camera
 
     def place_for(self, camera: str | None) -> str | None:
         """A name for where a camera looks, when it isn't the main door camera."""
@@ -295,7 +320,7 @@ class Visitors:
             "instructions": instructions + i18n.write_in(),
             "structure": structure,
             "attachments": [
-                {"media_content_id": f"media-source://camera/{camera or self.camera}", "media_content_type": "image/jpeg"}
+                {"media_content_id": _media_id(camera or self.camera), "media_content_type": "image/jpeg"}
             ],
         }
         if ai_entity := ai_task_entity(self.hass, self.options):
@@ -316,7 +341,7 @@ class Visitors:
         place = self.place_for(camera)
         self._busy = True
         try:
-            await asyncio.sleep(1)
+            picture = await self.picture_for(trigger, camera)
             result = await self._look(
                 "Sentient: who's at the door",
                 "This is a camera picture at the door or gate, taken as someone rang or was seen there. "
@@ -332,7 +357,7 @@ class Visitors:
                     "parcel": {"description": "Carrying or put down a parcel", "required": False,
                                "selector": {"boolean": {}}},
                 },
-                camera,
+                picture,
             )
         except HomeAssistantError as err:
             _LOGGER.warning("Sentient could not look at the door: %s", err)
