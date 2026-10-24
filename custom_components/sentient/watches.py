@@ -29,6 +29,7 @@ from homeassistant.helpers.event import async_track_point_in_utc_time, async_tra
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from .ai import ai_task_entity
 from . import i18n
 from .i18n import t
 from .const import (
@@ -498,7 +499,7 @@ class WatchManager:
             },
             "attachments": [await self._attachment(watch.entity_id, watch.spot)],
         }
-        if ai_entity := ai_entity or self.options.get(CONF_AI_TASK_ENTITY):
+        if ai_entity := ai_entity or ai_task_entity(self.hass, self.options):
             data["entity_id"] = ai_entity
         response = await self.hass.services.async_call(
             "ai_task", "generate_data", data, blocking=True, return_response=True
@@ -551,7 +552,7 @@ class WatchManager:
                 )
             ],
         }
-        if ai_entity := self.options.get(CONF_AI_TASK_ENTITY):
+        if ai_entity := ai_task_entity(self.hass, self.options):
             data["entity_id"] = ai_entity
         self.spend()  # someone asked, so always look; it still counts towards today's total
         self._save()

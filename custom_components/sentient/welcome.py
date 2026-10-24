@@ -17,8 +17,9 @@ from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
+from .ai import ai_task_entity
 from . import i18n
-from .const import CONF_AI_TASK_ENTITY, CONF_WELCOME, CONF_WELCOME_PEOPLE
+from .const import CONF_WELCOME, CONF_WELCOME_PEOPLE
 from .i18n import t
 
 _LOGGER = logging.getLogger(__name__)
@@ -97,7 +98,7 @@ class Welcome:
                     "Never say or imply the house was empty." + i18n.write_in() + "\n\n" + "\n".join(lines)
                 ),
             }
-            if ai := self.options.get(CONF_AI_TASK_ENTITY):
+            if ai := ai_task_entity(self.hass, self.options):
                 data["entity_id"] = ai
             try:
                 rt.watches.spend()

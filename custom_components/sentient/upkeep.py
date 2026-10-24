@@ -22,8 +22,8 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.util import dt as dt_util
 
+from .ai import ai_task_entity
 from .const import (
-    CONF_AI_TASK_ENTITY,
     CONF_BRIEFING_CALENDARS,
     CONF_BRIEFING_SECTIONS,
     CONF_BRIEFING_SYSTEM,
@@ -333,7 +333,7 @@ class Upkeep:
         data: dict[str, Any] = {"task_name": task, "instructions": instructions + i18n.write_in()}
         if structure:
             data["structure"] = structure
-        if ai_entity := rt.options.get(CONF_AI_TASK_ENTITY):
+        if ai_entity := ai_task_entity(self.hass, rt.options):
             data["entity_id"] = ai_entity
         rt.watches.spend()
         response = await self.hass.services.async_call(

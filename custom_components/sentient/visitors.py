@@ -28,8 +28,8 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from .ai import ai_task_entity
 from .const import (
-    CONF_AI_TASK_ENTITY,
     CONF_ANNOUNCE_VISITORS,
     CONF_DOOR_CAMERA,
     CONF_DOOR_TRIGGERS,
@@ -235,7 +235,7 @@ class Visitors:
                 {"media_content_id": f"media-source://camera/{self.camera}", "media_content_type": "image/jpeg"}
             ],
         }
-        if ai_entity := self.options.get(CONF_AI_TASK_ENTITY):
+        if ai_entity := ai_task_entity(self.hass, self.options):
             data["entity_id"] = ai_entity
         response = await self.hass.services.async_call(
             "ai_task", "generate_data", data, blocking=True, return_response=True

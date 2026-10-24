@@ -19,7 +19,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
 
-from .const import CONF_AI_TASK_ENTITY, DOMAIN
+from .ai import ai_task_entity
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class Spots:
             },
             "attachments": [{"media_content_id": f"media-source://camera/{camera}", "media_content_type": "image/jpeg"}],
         }
-        if ai_entity := self.options.get(CONF_AI_TASK_ENTITY):
+        if ai_entity := ai_task_entity(self.hass, self.options):
             data["entity_id"] = ai_entity
         response = await self.hass.services.async_call(
             "ai_task", "generate_data", data, blocking=True, return_response=True
