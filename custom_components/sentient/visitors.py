@@ -238,8 +238,10 @@ class Visitors:
             return
         if not self.camera_for(new.entity_id):
             return
-        if new.domain == "event":
-            fired = old.state != new.state  # event entities change state to the time they fired
+        if new.domain in ("event", "image"):
+            # event entities change state to the time they fired; an image entity (a battery
+            # camera's "last event" snapshot) to the time a new picture arrived
+            fired = old.state != new.state and not (new.domain == "image" and old.state == STATE_UNKNOWN)
         else:
             fired = new.state == STATE_ON and old.state != STATE_ON
         if not fired:

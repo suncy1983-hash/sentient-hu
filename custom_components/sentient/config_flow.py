@@ -221,7 +221,7 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
                 selector.EntitySelectorConfig(domain="camera")
             ),
             vol.Optional(CONF_DOOR_TRIGGERS, **d(CONF_DOOR_TRIGGERS, [])): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["binary_sensor", "event"], multiple=True)
+                selector.EntitySelectorConfig(domain=["binary_sensor", "event", "image"], multiple=True)
             ),
             vol.Optional(CONF_FACE_SENSOR, **d(CONF_FACE_SENSOR)): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=["sensor", "input_text", "text", "image"])
