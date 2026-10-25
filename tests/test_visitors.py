@@ -259,3 +259,26 @@ async def test_new_event_snapshot_is_a_trigger(hass: HomeAssistant) -> None:
         hass.states.async_set("image.kapu_last_event", "2026-10-25T15:01:04+00:00")
         await hass.async_block_till_done()
     assert ai[0].data["attachments"][0]["media_content_id"] == "media-source://image/image.kapu_last_event"
+
+
+async def test_unnamed_face_id_matches_a_person_alias(hass: HomeAssistant) -> None:
+    """eufy knew the face (person_id) but the bridge couldn't name it."""
+    from homeassistant.helpers import entity_registry as er
+
+    await _setup(hass, announce_visitors=True, parcel_alerts=False, door_triggers=["binary_sensor.kapu_person"])
+    _gate_device(hass)
+    person = er.async_get(hass).async_get_or_create("person", "person", "suncy", suggested_object_id="suncy")
+    er.async_get(hass).async_update_entity(person.entity_id, aliases={"Sanya", "face 28"})
+    hass.states.async_set("person.suncy", "home", {"friendly_name": "Suncy"})
+    await hass.async_block_till_done()
+    said = async_mock_service(hass, "assist_satellite", "announce")
+    _ai(hass, [{"kind": "visitor", "description": "A man in a brown jumper"}])
+    with patch("custom_components.sentient.visitors.household_moving", create=True), \
+         patch("custom_components.sentient.visitors.Visitors.household_moving", return_value=False):
+        hass.states.async_set("sensor.kapu_last_person", "Unknown", {"recognized": False, "person_id": 28})
+        with patch("custom_components.sentient.visitors.asyncio.sleep"):
+            hass.states.async_set("binary_sensor.kapu_person", "on")
+            await hass.async_block_till_done()
+    assert not said
+    visit = hass.states.get("sensor.nova_visitors").attributes["recent"][0]
+    assert visit["name"] == "Suncy" and visit["household"] is True

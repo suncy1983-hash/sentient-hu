@@ -172,6 +172,16 @@ class Visitors:
                 return True
         return False
 
+    def person_for_face(self, face_id: Any) -> str | None:
+        """The household member given the alias 'face <id>' for a camera's face-recognition id."""
+        wanted = f"face {face_id}".lower()
+        reg = er.async_get(self.hass)
+        for st in self.hass.states.async_all("person"):
+            entry = reg.async_get(st.entity_id)
+            if entry and any(isinstance(a, str) and a.strip().lower() == wanted for a in entry.aliases):
+                return st.name
+        return None
+
     def household_moving(self) -> bool:
         """Someone who lives here has just arrived or left — the camera most likely saw them."""
         now = dt_util.utcnow()
@@ -211,7 +221,15 @@ class Visitors:
             candidates.append(configured)
         for entity_id in candidates:
             st = self.hass.states.get(entity_id)
-            if st is None or st.state.strip().lower() in _NO_NAME:
+            if st is None:
+                continue
+            if st.state.strip().lower() in _NO_NAME:
+                # the camera knew the face but the integration couldn't name it: a person whose
+                # aliases include "face <id>" is who it was
+                face_id = st.attributes.get("person_id")
+                if face_id is not None and dt_util.utcnow() - st.last_updated <= FACE_FRESH:
+                    if name := self.person_for_face(face_id):
+                        return name
                 continue
             if dt_util.utcnow() - st.last_changed > FACE_FRESH:
                 continue
