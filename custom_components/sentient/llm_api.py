@@ -420,6 +420,75 @@ class ForgetVoiceTool(_Tool):
             return {"error": str(err)}
 
 
+class LearnFaceTool(_Tool):
+    name = "sentient_learn_face"
+    description = (
+        "Learn someone's face, so the house recognises them at the door and gate (and doesn't announce "
+        "the family). Two ways: (1) they are in front of a camera right now ('Kata is at the gate, learn her "
+        "face') — set camera to the camera's name or area; (2) a recent visitor was them ('that was "
+        "Sanya', 'the last visitor was Szofi') — leave camera empty; visit 0 is the latest visit with a "
+        "face, 1 the one before. A few pictures in different light make it reliable."
+    )
+    parameters = vol.Schema({
+        vol.Required("name"): cv.string,
+        vol.Optional("camera"): cv.string,
+        vol.Optional("visit", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=20)),
+    })
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        from .watches import resolve_entity
+
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        args = tool_input.tool_args
+        camera = None
+        if args.get("camera"):
+            camera = resolve_entity(hass, args["camera"], "camera")
+            if camera is None or not camera.startswith("camera."):
+                return {"error": f"I can't find a camera called '{args['camera']}'"}
+        try:
+            return await rt.visitors.async_learn_face(args["name"], camera, int(args.get("visit") or 0))
+        except HomeAssistantError as err:
+            return {"error": str(err)}
+
+
+class FacesTool(_Tool):
+    annotations = _read_only()
+    name = "sentient_faces"
+    description = "Whose faces the house has learned (to recognise people at the door and gate)."
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        try:
+            return {"faces": await rt.faces.async_people()}
+        except HomeAssistantError as err:
+            return {"error": str(err)}
+
+
+class ForgetFaceTool(_Tool):
+    name = "sentient_forget_face"
+    description = "Forget someone's face completely (it can be learned again later)."
+    parameters = vol.Schema({vol.Required("name"): cv.string})
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        try:
+            return {"forgotten": await rt.faces.async_forget(tool_input.tool_args["name"])}
+        except HomeAssistantError as err:
+            return {"error": str(err)}
+
+
 class ListWatchesTool(_Tool):
     annotations = _read_only()
     name = "sentient_watches"
@@ -907,7 +976,8 @@ class SentientAPI(llm.API):
             tools=[RememberTool(), RecallTool(), ForgetTool(), AnnounceTool(),
                    WatchTool(), RemindTool(), ListWatchesTool(), CancelWatchTool(), LookTool(),
                    RoutinesTool(), AdoptRoutineTool(), ForgetRoutineTool(), HeatingTool(), NightWatchTool(), WeeklyTool(), BriefingTool(), VisitorsTool(), SpotTool(), MotionLightsTool(), TimelineTool(), QuietTool(), ShushTool(), RunRoutineTool(), EnergyTool(), SecurityTool(), ScenesTool(), CalendarEventTool()]
-                  + ([LearnVoiceTool(), VoicesTool(), ForgetVoiceTool()] if self._voice_on() else []),
+                  + ([LearnVoiceTool(), VoicesTool(), ForgetVoiceTool(), LearnFaceTool(), FacesTool(), ForgetFaceTool()]
+                     if self._voice_on() else []),
         )
 
     def _voice_on(self) -> bool:

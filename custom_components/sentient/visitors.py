@@ -44,6 +44,7 @@ from .const import (
 )
 from . import i18n
 from .i18n import t
+from .faces import FaceError, FaceID, async_picture
 from .memory import _fold
 from .watches import local_when
 
@@ -95,6 +96,7 @@ class Visitors:
         self._doorstep_pending = False
         self.parcel_waiting = False  # a parcel was there at the last look
         self._person_moved: datetime | None = None  # when someone who lives here last arrived or left
+        self.faces: FaceID | None = None  # Sentient's own face recognition, when the Voice ID app is set up
 
     async def async_start(self) -> None:
         data = await self._store.async_load() or {}
@@ -151,6 +153,37 @@ class Visitors:
                     return image
             await asyncio.sleep(1)
         return camera
+
+    async def _faces_in(self, picture: str | None) -> dict[str, Any] | None:
+        """Who Sentient's own face recognition sees in the visit's picture (None if it can't tell)."""
+        if not picture or self.faces is None:
+            return None
+        try:
+            content = await async_picture(self.hass, picture)
+        except HomeAssistantError as err:
+            _LOGGER.debug("No picture for the face check: %s", err)
+            return None
+        return await self.faces.async_identify(content)
+
+    async def async_learn_face(self, name: str, camera: str | None = None, visit: int = 0) -> dict[str, Any]:
+        """Teach a face: from a camera right now, or from a recent visit ("that was Kata")."""
+        if self.faces is None or not self.faces.enabled:
+            raise FaceError("face recognition isn't set up (no Voice ID address in Sentient's settings)")
+        name = name.strip()
+        if camera:
+            content = await async_picture(self.hass, camera)
+            samples = await self.faces.async_learn_picture(name, content)
+            return {"learned": name, "from": self.hass.states.get(camera).name if self.hass.states.get(camera) else camera,
+                    "samples": samples}
+        with_face = [v for v in self.log if v.get("face_id")]
+        if visit >= len(with_face):
+            raise FaceError("no recent visit with a clear face to learn from")
+        chosen = with_face[visit]
+        samples = await self.faces.async_learn_ids(name, [chosen["face_id"]])
+        chosen["name"] = name
+        chosen["household"] = self.is_household(name)
+        self._save()
+        return {"learned": name, "from_visit": chosen["time"], "description": chosen["description"], "samples": samples}
 
     def place_for(self, camera: str | None) -> str | None:
         """A name for where a camera looks, when it isn't the main door camera."""
@@ -367,8 +400,11 @@ class Visitors:
         camera = self.camera_for(trigger)
         place = self.place_for(camera)
         self._busy = True
+        face_task = None
         try:
             picture = await self.picture_for(trigger, camera)
+            if self.faces is not None and self.faces.enabled:
+                face_task = self.hass.async_create_task(self._faces_in(picture), eager_start=False)
             result = await self._look(
                 "Sentient: who's at the door",
                 "This is a camera picture at the door or gate, taken as someone rang or was seen there. "
@@ -386,13 +422,17 @@ class Visitors:
                 },
                 picture,
             )
+            face = await face_task if face_task is not None else None
         except HomeAssistantError as err:
             _LOGGER.warning("Sentient could not look at the door: %s", err)
+            if face_task is not None:
+                face_task.cancel()
             return None
         finally:
             self._busy = False
         kind = result.get("kind") if result.get("kind") in KINDS else "unknown"
-        name = self.recognised_name(trigger)
+        # the camera's own face recognition first; Sentient's when the camera couldn't name anyone
+        name = self.recognised_name(trigger) or (face or {}).get("name")
         household = self.is_household(name) or (not name and self.household_moving())
         visit = {
             "name": name,
@@ -404,6 +444,7 @@ class Visitors:
             "trigger": trigger,
             "place": place,
             "household": household,
+            "face_id": (face or {}).get("id"),  # so "that was Kata" can teach this face afterwards
         }
         self.log.appendleft(visit)
         self._save()

@@ -14,6 +14,14 @@ it with the voices it has been taught. Audio is never stored — only the voice 
 
 "known" means it is sure; "unsure" means it is probably that person but not sure enough to say.
 When it is very sure, the print is kept (up to a limit) so it keeps getting better at that voice.
+
+Faces work the same way, from a picture (JPEG/PNG in the body); pictures are never stored either:
+
+    POST   /face/identify[?learn=0]     -> {"faces": [{"name", "score", "known", "unsure", "id", "box",
+                                            "quality"}, ...], "best": <the known face, or the biggest>}
+    POST   /face/enroll?name=Lili       -> {"name": "Lili", "samples": 3}   (picture in the body)
+    POST   /face/enroll {"name": "Lili", "ids": ["<face id>"]}             (a face it has just seen)
+    GET    /face/people  ·  DELETE /face/people/<name>
 """
 
 from __future__ import annotations
@@ -36,6 +44,7 @@ _LOGGER = logging.getLogger("voice_id")
 DATA = Path(os.environ.get("VOICE_ID_DATA", "/data"))
 MODEL = os.environ.get("VOICE_ID_MODEL", "/models/wespeaker.onnx")
 TEXT_MODEL = os.environ.get("VOICE_ID_TEXT_MODEL", "/models/e5")
+FACE_MODELS = os.environ.get("VOICE_ID_FACE_MODELS", "/models/faces")
 RATE = 16000
 MIN_SECONDS = 0.6
 MAX_ENROLLED = 40
@@ -86,8 +95,11 @@ def unit(v) -> np.ndarray:
 
 
 class Voices:
-    def __init__(self, folder: Path, threshold: float = 0.7, margin: float = 0.06, learn: bool = True) -> None:
-        self.path = folder / "voices.json"
+    """A gallery of named prints — voice prints, and (as faces.json) face prints."""
+
+    def __init__(self, folder: Path, threshold: float = 0.7, margin: float = 0.06, learn: bool = True,
+                 filename: str = "voices.json") -> None:
+        self.path = folder / filename
         self.threshold, self.margin, self.learn = threshold, margin, learn
         self.people: dict[str, dict[str, list[np.ndarray]]] = {}
         self.recent: OrderedDict[str, np.ndarray] = OrderedDict()
@@ -164,10 +176,125 @@ class Voices:
         return [{"name": n, "samples": len(p["enrolled"]), "learned": len(p["learned"])} for n, p in self.people.items()]
 
 
+# ----- faces --------------------------------------------------------------------------------
+MIN_FACE = 32  # pixels; smaller faces are too blurry to tell apart
+MIN_FACE_SCORE = 0.75
+MAX_SIDE = 1600
+
+
+class FaceModel:
+    """YuNet finds the faces in a picture; SFace turns each one into 128 numbers.
+
+    Both are small OpenCV models that run on the CPU. Loaded on first use.
+    """
+
+    def __init__(self, detector: str, recognizer: str) -> None:
+        self.detector_path, self.recognizer_path = detector, recognizer
+        self._detector = None
+        self._recognizer = None
+
+    def _load(self) -> None:
+        import cv2  # noqa: PLC0415
+
+        self._cv2 = cv2
+        self._detector = cv2.FaceDetectorYN.create(self.detector_path, "", (320, 320), MIN_FACE_SCORE, 0.3, 50)
+        self._recognizer = cv2.FaceRecognizerSF.create(self.recognizer_path, "")
+        _LOGGER.info("Face models loaded")
+
+    def __call__(self, picture: bytes) -> list[dict]:
+        """Every usable face in a JPEG/PNG, biggest first: {"box": [x, y, w, h], "score", "emb"}."""
+        if self._detector is None:
+            self._load()
+        cv2 = self._cv2
+        img = cv2.imdecode(np.frombuffer(picture, np.uint8), cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("not a picture")
+        h, w = img.shape[:2]
+        scale = min(1.0, MAX_SIDE / max(h, w))
+        if scale < 1.0:
+            img = cv2.resize(img, (int(w * scale), int(h * scale)))
+            h, w = img.shape[:2]
+        self._detector.setInputSize((w, h))
+        _, found = self._detector.detect(img)
+        faces = []
+        for row in found if found is not None else []:
+            x, y, fw, fh, score = float(row[0]), float(row[1]), float(row[2]), float(row[3]), float(row[-1])
+            if min(fw, fh) < MIN_FACE or score < MIN_FACE_SCORE:
+                continue
+            crop = self._recognizer.alignCrop(img, row)
+            emb = unit(self._recognizer.feature(crop).flatten())
+            faces.append({"box": [round(x / scale), round(y / scale), round(fw / scale), round(fh / scale)],
+                          "score": round(score, 3), "emb": emb})
+        faces.sort(key=lambda f: f["box"][2] * f["box"][3], reverse=True)
+        return faces
+
+
+class Faces:
+    """POST /face/identify (a picture) -> who is in it; POST /face/enroll; GET /face/people; DELETE."""
+
+    def __init__(self, gallery: Voices, model) -> None:
+        self.gallery, self.model = gallery, model
+        self._lock = asyncio.Lock()
+
+    async def _faces(self, request: web.Request) -> list[dict]:
+        body = await request.read()
+        if not body:
+            raise web.HTTPBadRequest(text="a picture is needed")
+        async with self._lock:
+            try:
+                return await asyncio.get_running_loop().run_in_executor(None, self.model, body)
+            except ValueError as err:
+                raise web.HTTPBadRequest(text=str(err)) from err
+
+    async def identify(self, request: web.Request) -> web.Response:
+        learn = request.query.get("learn", "1") != "0"
+        out = []
+        for face in await self._faces(request):
+            result = self.gallery.identify(face["emb"], learn=learn)
+            out.append({**result, "box": face["box"], "quality": face["score"]})
+        known = [f for f in out if f["known"]]
+        best = known[0] if known else (out[0] if out else None)
+        return web.json_response({"faces": out, "best": best, "count": len(out)})
+
+    async def enroll(self, request: web.Request) -> web.Response:
+        if request.content_type == "application/json":
+            data = await request.json()
+            name = str(data.get("name") or "").strip()
+            embs = [self.gallery.recent[i] for i in data.get("ids") or [] if i in self.gallery.recent]
+            if not embs:
+                raise web.HTTPNotFound(text="none of those faces are still remembered")
+        else:
+            name = request.query.get("name", "").strip()
+            faces = await self._faces(request)
+            if not faces:
+                raise web.HTTPUnprocessableEntity(text="no clear face in the picture")
+            embs = [faces[0]["emb"]]  # the biggest face is the one meant
+        if not name:
+            raise web.HTTPBadRequest(text="a name is needed")
+        return web.json_response({"name": name, "samples": self.gallery.enroll(name, embs)})
+
+    async def people(self, _request: web.Request) -> web.Response:
+        return web.json_response(self.gallery.listing())
+
+    async def forget(self, request: web.Request) -> web.Response:
+        name = request.match_info["name"]
+        if not self.gallery.forget(name):
+            raise web.HTTPNotFound(text=f"no face called {name}")
+        return web.json_response({"forgotten": name})
+
+    def routes(self) -> list:
+        return [
+            web.post("/face/identify", self.identify),
+            web.post("/face/enroll", self.enroll),
+            web.get("/face/people", self.people),
+            web.delete("/face/people/{name}", self.forget),
+        ]
+
+
 # ----- web ----------------------------------------------------------------------------------
 class Service:
-    def __init__(self, voices: Voices, embed, meaning: "Meaning | None" = None) -> None:
-        self.voices, self.embed, self.meaning = voices, embed, meaning
+    def __init__(self, voices: Voices, embed, meaning: "Meaning | None" = None, faces: "Faces | None" = None) -> None:
+        self.voices, self.embed, self.meaning, self.faces = voices, embed, meaning, faces
         self._lock = asyncio.Lock()  # one embedding at a time keeps a small box responsive
 
     async def _print(self, request: web.Request) -> np.ndarray:
@@ -222,6 +349,8 @@ class Service:
         ])
         if self.meaning is not None:
             app.add_routes([web.post("/embed", self.meaning.embed)])
+        if self.faces is not None:
+            app.add_routes(self.faces.routes())
         return app
 
 
@@ -335,7 +464,16 @@ def main() -> None:
         _LOGGER.info("Text model: %s", model_id)
     else:
         _LOGGER.warning("No text model in %s: semantic memory is off", TEXT_MODEL)
-    web.run_app(Service(voices, make_embedder(MODEL), meaning).app(),
+    faces = None
+    detector, recognizer = Path(FACE_MODELS) / "yunet.onnx", Path(FACE_MODELS) / "sface.onnx"
+    if detector.exists() and recognizer.exists():
+        gallery = Voices(DATA, float(options.get("face_threshold", 0.40)), float(options.get("face_margin", 0.05)),
+                         bool(options.get("learn", True)), filename="faces.json")
+        faces = Faces(gallery, FaceModel(str(detector), str(recognizer)))
+        _LOGGER.info("Face recognition ready: %d faces, threshold %.2f", len(gallery.people), gallery.threshold)
+    else:
+        _LOGGER.warning("No face models in %s: face recognition is off", FACE_MODELS)
+    web.run_app(Service(voices, make_embedder(MODEL), meaning, faces).app(),
                 port=int(os.environ.get("VOICE_ID_PORT", "8765")), print=None)
 
 

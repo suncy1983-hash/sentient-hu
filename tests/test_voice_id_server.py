@@ -94,3 +94,50 @@ async def test_embed_endpoint(tmp_path, socket_enabled) -> None:
 def test_silence_is_trimmed() -> None:
     x = np.concatenate([np.zeros(16000), np.ones(8000) * 0.3, np.zeros(16000)]).astype(np.float32)
     assert 8000 <= len(server.trim(x)) <= 8000 + 2 * 1600
+
+
+# ----- faces -------------------------------------------------------------------------------
+_FACES = {k: server.unit(np.random.default_rng(100 + k).normal(size=128)) for k in range(1, 6)}
+
+
+def _face_model(picture: bytes) -> list[dict]:
+    """A stand-in: the 'picture' is b"faces:1,3" — who is in it, biggest first."""
+    if not picture.startswith(b"faces:"):
+        raise ValueError("not a picture")
+    out = []
+    for i, who in enumerate(p for p in picture[6:].decode().split(",") if p):
+        noise = np.random.default_rng(len(picture) + i).normal(scale=0.05, size=128)
+        out.append({"box": [10, 10, 100 - i * 10, 100 - i * 10], "score": 0.9, "emb": server.unit(_FACES[int(who)] + noise)})
+    return out
+
+
+async def test_faces_enrol_identify_learn_from_a_visit_and_forget(tmp_path, socket_enabled) -> None:
+    faces = server.Faces(server.Voices(tmp_path, 0.4, 0.05, filename="faces.json"), _face_model)
+    svc = server.Service(server.Voices(tmp_path), _embed, None, faces)
+    async with TestClient(TestServer(svc.app())) as client:
+        assert (await client.post("/face/enroll?name=Sanya", data=b"faces:1")).status == 200
+        assert (await client.post("/face/enroll?name=Kata", data=b"faces:2,1")).status == 200  # biggest = Kata
+        res = await (await client.post("/face/identify", data=b"faces:2")).json()
+        assert res["best"]["name"] == "Kata" and res["best"]["known"]
+
+        # a stranger and Sanya: the known face is the answer even if it isn't the biggest
+        res = await (await client.post("/face/identify", data=b"faces:4,1")).json()
+        assert res["count"] == 2 and res["best"]["name"] == "Sanya"
+        assert not res["faces"][0]["known"]
+
+        # "that was Szofi" after the visit: taught from the face it has just seen
+        seen = await (await client.post("/face/identify?learn=0", data=b"faces:3")).json()
+        assert not seen["best"]["known"]
+        res = await (await client.post("/face/enroll", json={"name": "Szofi", "ids": [seen["best"]["id"]]})).json()
+        assert res == {"name": "Szofi", "samples": 1}
+        res = await (await client.post("/face/identify", data=b"faces:3,")).json()
+        assert res["best"]["name"] == "Szofi"
+
+        assert (await client.post("/face/identify", data=b"faces:")).status == 200
+        assert (await client.post("/face/enroll?name=X", data=b"faces:")).status == 422  # no face
+        assert (await client.post("/face/identify", data=b"junk")).status == 400
+        people = {p["name"] for p in await (await client.get("/face/people")).json()}
+        assert people == {"Sanya", "Kata", "Szofi"}
+        assert (await client.delete("/face/people/kata")).status == 200
+        # voices and faces live in separate files
+        assert (tmp_path / "faces.json").exists() and not (tmp_path / "voices.json").exists()

@@ -35,6 +35,11 @@ if not got:
     raise SystemExit("could not download a text model")
 EOF
 
+# Faces: OpenCV's YuNet (finds faces, 0.2 MB) and SFace (tells them apart, 38 MB).
+RUN pip install --no-cache-dir "opencv-python-headless>=4.9,<5"
+ADD https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx /models/faces/yunet.onnx
+ADD https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx /models/faces/sface.onnx
+
 COPY server.py /server.py
 
 CMD ["python3", "/server.py"]

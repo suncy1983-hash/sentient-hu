@@ -61,6 +61,7 @@ from .nightwatch import NightWatch
 from .watches import WatchManager
 from .speech import SpeechRouter
 from .voice import VoiceID
+from .faces import FaceID
 from .semantic import Embedder, SemanticIndex
 
 _LOGGER = logging.getLogger(__name__)
@@ -97,6 +98,7 @@ class SentientRuntime:
     heating: Heating
     night_watch: NightWatch
     voice: VoiceID
+    faces: FaceID
 
 
 type SentientConfigEntry = ConfigEntry[SentientRuntime]
@@ -228,6 +230,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
     health.async_start()
     entry.async_on_unload(health.async_stop)
     visitors = Visitors(hass, entry.entry_id, options, speech, watches)
+    visitors.faces = FaceID(hass, options)
     await visitors.async_start()
     entry.async_on_unload(visitors.async_stop)
     timeline.attach_visitors(visitors.log)
@@ -260,7 +263,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
         options=options, memory=memory, speech=speech, tracker=tracker, watches=watches,
         noticer=noticer, learner=learner, upkeep=upkeep, visitors=visitors, spots=spots, health=health,
         motion_lights=motion_lights, timeline=timeline, notifier=notifier, welcome=welcome, mutes=mutes, critical=critical, shortcuts=shortcuts, left_open=left_open,
-        feedback=feedback, heating=heating, night_watch=night_watch, voice=VoiceID(hass, options),
+        feedback=feedback, heating=heating, night_watch=night_watch, voice=VoiceID(hass, options), faces=visitors.faces,
     )
     night_watch.async_start()
     entry.async_on_unload(night_watch.async_stop)
@@ -312,6 +315,7 @@ async def _async_options_updated(hass: HomeAssistant, entry: SentientConfigEntry
     entry.runtime_data.notifier.options = options
     entry.runtime_data.welcome.options = options
     entry.runtime_data.voice.options = options
+    entry.runtime_data.faces.options = options
     if (semantic := entry.runtime_data.memory.semantic) is not None:
         semantic.embedder.options = options
         semantic.schedule()
@@ -430,6 +434,34 @@ def _register_services(hass: HomeAssistant) -> None:
         removed = _runtime(hass).watches.cancel(call.data["what"])
         return {"cancelled": removed.what if removed else None}
 
+    async def learn_face(call: ServiceCall) -> ServiceResponse:
+        from .faces import FaceError, async_photo, async_picture  # noqa: PLC0415
+
+        rt = _runtime(hass)
+        name = call.data["name"].strip()
+        if call.data.get("forget"):
+            return {"forgotten": await rt.faces.async_forget(name)}
+        photo = call.data.get("photo")
+        if isinstance(photo, dict):
+            photo = photo.get("media_content_id")
+        if photo:
+            content = await async_photo(hass, str(photo))
+        elif call.data.get("camera"):
+            content = await async_picture(hass, call.data["camera"])
+        else:
+            raise FaceError("Give a photo or a camera to learn the face from")
+        return {"learned": name, "samples": await rt.faces.async_learn_picture(name, content)}
+
+    hass.services.async_register(
+        DOMAIN, "learn_face", learn_face,
+        schema=vol.Schema({
+            vol.Required("name"): cv.string,
+            vol.Optional("photo"): vol.Any(cv.string, dict),
+            vol.Optional("camera"): cv.entity_id,
+            vol.Optional("forget", default=False): cv.boolean,
+        }),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
     hass.services.async_register(
         DOMAIN, SERVICE_WATCH, watch, schema=WATCH_SCHEMA, supports_response=SupportsResponse.OPTIONAL
     )

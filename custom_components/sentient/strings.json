@@ -607,6 +607,28 @@
     "weekly_report": {
       "name": "Weekly report",
       "description": "Put together what the house learned and noticed in the last week, and keep it on the timeline."
+    },
+    "learn_face": {
+      "name": "Learn a face",
+      "description": "Teach Sentient someone's face from a photo (upload it to My media) or a camera, so it recognises them at the door and gate.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Who it is, e.g. Kata."
+        },
+        "photo": {
+          "name": "Photo",
+          "description": "A photo with their face, clear and from the front."
+        },
+        "camera": {
+          "name": "Camera",
+          "description": "Or take the picture from this camera now (they should be in front of it)."
+        },
+        "forget": {
+          "name": "Forget",
+          "description": "Forget this person's face instead."
+        }
+      }
     }
   }
 }

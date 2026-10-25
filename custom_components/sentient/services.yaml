@@ -215,3 +215,23 @@ run_routine:
       selector:
         boolean:
 weekly_report:
+learn_face:
+  fields:
+    name:
+      required: true
+      example: "Kata"
+      selector:
+        text:
+    photo:
+      selector:
+        media:
+          accept:
+            - image/*
+    camera:
+      selector:
+        entity:
+          domain: [camera, image]
+    forget:
+      default: false
+      selector:
+        boolean:

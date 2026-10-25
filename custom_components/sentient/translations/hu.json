@@ -607,6 +607,28 @@
     "weekly_report": {
       "name": "Heti jelentés",
       "description": "Összeállítja, mit tanult és vett észre a ház az elmúlt héten, és az idővonalon tartja."
+    },
+    "learn_face": {
+      "name": "Arc betanítása",
+      "description": "Tanítsd meg Sentientnek valakinek az arcát egy fotóról (töltsd fel a Saját médiába) vagy egy kameráról, hogy felismerje az ajtónál és a kapunál.",
+      "fields": {
+        "name": {
+          "name": "Név",
+          "description": "Ki az, pl. Kata."
+        },
+        "photo": {
+          "name": "Fotó",
+          "description": "Egy fotó az arcáról, élesen, szemből."
+        },
+        "camera": {
+          "name": "Kamera",
+          "description": "Vagy most erről a kameráról készüljön a kép (álljon előtte)."
+        },
+        "forget": {
+          "name": "Elfelejtés",
+          "description": "Inkább felejtse el ennek a személynek az arcát."
+        }
+      }
     }
   }
 }
