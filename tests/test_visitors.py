@@ -282,3 +282,26 @@ async def test_unnamed_face_id_matches_a_person_alias(hass: HomeAssistant) -> No
     assert not said
     visit = hass.states.get("sensor.nova_visitors").attributes["recent"][0]
     assert visit["name"] == "Suncy" and visit["household"] is True
+
+
+async def test_only_a_real_arrival_counts_as_the_household_moving(hass: HomeAssistant) -> None:
+    await _setup(hass, announce_visitors=True, parcel_alerts=False, door_triggers=["binary_sensor.kapu_person"])
+    _gate_device(hass)
+    hass.states.async_set("person.kata", "home")  # appears at startup: not an arrival
+    await hass.async_block_till_done()
+    said = async_mock_service(hass, "assist_satellite", "announce")
+    _ai(hass, [{"kind": "visitor", "description": "A stranger"}])
+    with patch("custom_components.sentient.visitors.asyncio.sleep"):
+        hass.states.async_set("binary_sensor.kapu_person", "on")
+        await hass.async_block_till_done()
+    assert len(said) == 1  # a stranger right after a restart is still announced
+    hass.states.async_set("person.kata", "not_home")
+    hass.states.async_set("person.kata", "home")  # she just came back
+    hass.states.async_set("binary_sensor.kapu_person", "off")
+    await hass.async_block_till_done()
+    entry = hass.config_entries.async_entries("sentient")[0]
+    entry.runtime_data.visitors._last = None  # past the cooldown
+    with patch("custom_components.sentient.visitors.asyncio.sleep"):
+        hass.states.async_set("binary_sensor.kapu_person", "on")
+        await hass.async_block_till_done()
+    assert len(said) == 1

@@ -94,6 +94,7 @@ class Visitors:
         self._doorstep_last: datetime | None = None
         self._doorstep_pending = False
         self.parcel_waiting = False  # a parcel was there at the last look
+        self._person_moved: datetime | None = None  # when someone who lives here last arrived or left
 
     async def async_start(self) -> None:
         data = await self._store.async_load() or {}
@@ -184,8 +185,7 @@ class Visitors:
 
     def household_moving(self) -> bool:
         """Someone who lives here has just arrived or left — the camera most likely saw them."""
-        now = dt_util.utcnow()
-        return any(now - st.last_changed < HOUSEHOLD_MOVING for st in self.hass.states.async_all("person"))
+        return self._person_moved is not None and dt_util.utcnow() - self._person_moved < HOUSEHOLD_MOVING
 
     @property
     def triggers(self) -> set[str]:
@@ -245,6 +245,13 @@ class Visitors:
     @callback
     def _on_state_changed(self, event: Event[EventStateChangedData]) -> None:
         new = event.data["new_state"]
+        if new is not None and new.domain == "person":
+            # a real arrival or departure, not a restart or a person entity coming back online
+            was = event.data["old_state"]
+            if was is not None and was.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN) \
+                    and new.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN) and was.state != new.state:
+                self._person_moved = dt_util.utcnow()
+            return
         if new is None or (new.entity_id not in self.doorstep and new.entity_id not in self.triggers):
             return
         old = event.data["old_state"]
