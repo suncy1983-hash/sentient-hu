@@ -295,6 +295,9 @@
       },
       "chime": {
         "name": "Chime"
+      },
+      "notify_target": {
+        "name": "Notifications: {name}"
       }
     },
     "stt": {

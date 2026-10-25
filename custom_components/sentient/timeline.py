@@ -133,7 +133,7 @@ class Timeline:
             "visitor", f"{where}{who}{visit.get('description') or t('timeline.someone_at_door')}", visit.get("kind"),
             parcel=bool(visit.get("parcel_left")) or None,
             # the household coming and going, or a false alarm: keep it in the log, don't notify
-            quiet=(bool(visit.get("household")) or visit.get("kind") == "nobody") or None,
+            quiet=(bool(visit.get("household")) or bool(visit.get("repeat")) or visit.get("kind") == "nobody") or None,
         )
 
     @callback

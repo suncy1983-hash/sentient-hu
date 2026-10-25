@@ -295,6 +295,9 @@
       },
       "chime": {
         "name": "Csengőhang"
+      },
+      "notify_target": {
+        "name": "Értesítés: {name}"
       }
     },
     "stt": {

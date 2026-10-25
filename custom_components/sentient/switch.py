@@ -14,7 +14,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
 from . import SentientConfigEntry
-from .const import CONF_CHIME, DOMAIN, EVENT_MODE_CHANGED
+from .const import CONF_CHIME, CONF_NOTIFY_TARGETS, DOMAIN, EVENT_MODE_CHANGED
 
 DEFAULT_HUSH_MINUTES = 60
 
@@ -22,7 +22,53 @@ DEFAULT_HUSH_MINUTES = 60
 async def async_setup_entry(
     hass: HomeAssistant, entry: SentientConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    async_add_entities([HushSwitch(entry), GuestSwitch(entry), ChimeSwitch(entry)])
+    phones = [NotifyTargetSwitch(hass, entry, target) for target in entry.runtime_data.options.get(CONF_NOTIFY_TARGETS) or []]
+    async_add_entities([HushSwitch(entry), GuestSwitch(entry), ChimeSwitch(entry), *phones])
+
+
+class NotifyTargetSwitch(SwitchEntity, RestoreEntity):
+    """One per phone Sentient notifies: off, and that phone gets nothing from Sentient."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_icon = "mdi:cellphone-message"
+    _attr_translation_key = "notify_target"
+
+    def __init__(self, hass: HomeAssistant, entry: SentientConfigEntry, target: str) -> None:
+        self._entry = entry
+        self._target = target
+        self._attr_unique_id = f"{entry.entry_id}_notify_{target}"
+        # named after the phone's owner (person), else the phone itself
+        person = entry.runtime_data.notifier.owner(target)
+        named = hass.states.get(person) if person else hass.states.get(target)
+        self._attr_translation_placeholders = {
+            "name": named.name if named else target.split(".", 1)[-1].replace("_", " ").title()
+        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)}, name=entry.title, manufacturer="Sentient",
+            model="Home brain", entry_type=DeviceEntryType.SERVICE,
+        )
+
+    async def async_added_to_hass(self) -> None:
+        last = await self.async_get_last_state()
+        if last is not None and last.state == "off":
+            self._entry.runtime_data.notifier.muted.add(self._target)
+
+    @property
+    def is_on(self) -> bool:
+        return self._target not in self._entry.runtime_data.notifier.muted
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"notify_entity": self._target, "person": self._entry.runtime_data.notifier.owner(self._target)}
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._entry.runtime_data.notifier.muted.discard(self._target)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self._entry.runtime_data.notifier.muted.add(self._target)
+        self.async_write_ha_state()
 
 
 class _ModeSwitch(SwitchEntity, RestoreEntity):

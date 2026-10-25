@@ -67,6 +67,8 @@ _NO_NAME = {"", "none", "unknown", "unavailable", "no face", "no_face", "nobody"
 _FACE_WORDS = ("face", "last_person", "recogni")
 HOUSEHOLD_MOVING = timedelta(minutes=3)
 EVENT_IMAGE_WAIT = 20  # seconds to wait for a battery camera's event snapshot
+SAME_CLOTHES = timedelta(hours=10)  # clothes are a good clue to who someone is for one day
+MAX_EARLIER = 8
 EVENT_IMAGE_SLACK = timedelta(seconds=10)
 KINDS = ["delivery", "visitor", "neighbour", "child", "unknown", "nobody"]
 
@@ -153,6 +155,20 @@ class Visitors:
                     return image
             await asyncio.sleep(1)
         return camera
+
+    def seen_earlier(self) -> list[dict[str, Any]]:
+        """Today's earlier visitors whose clothes were noted, newest first, one per outfit."""
+        since = dt_util.now() - SAME_CLOTHES
+        out, outfits = [], set()
+        for v in self.log:
+            when = dt_util.parse_datetime(v.get("time") or "")
+            if when is None or when < since or when.date() != dt_util.now().date():
+                break
+            outfit = (v.get("clothes") or "").lower()
+            if outfit and outfit not in outfits:
+                outfits.add(outfit)
+                out.append(v)
+        return out[:MAX_EARLIER]
 
     async def _faces_in(self, picture: str | None) -> dict[str, Any] | None:
         """Who Sentient's own face recognition sees in the visit's picture (None if it can't tell)."""
@@ -401,6 +417,15 @@ class Visitors:
         place = self.place_for(camera)
         self._busy = True
         face_task = None
+        earlier = self.seen_earlier()
+        seen = ""
+        if earlier:
+            seen = (
+                " People already seen here earlier today, with their clothes: "
+                + "; ".join(f"{i}. {v['clothes']}" for i, v in enumerate(earlier, 1))
+                + ". If this is clearly one of them again (the same clothes), set same_as to their number; "
+                "otherwise 0."
+            )
         try:
             picture = await self.picture_for(trigger, camera)
             if self.faces is not None and self.faces.enabled:
@@ -411,7 +436,8 @@ class Visitors:
                 "Describe who is there in a few plain words (e.g. 'a delivery driver holding a small "
                 "parcel', 'a man in a red coat', 'two children'). Don't guess names. Set kind to the best "
                 "match (nobody if no one is visible), and parcel to true if they are carrying or have put "
-                "down a parcel or package.",
+                "down a parcel or package. In clothes, describe what they wear in a few words, colours "
+                "first (e.g. 'brown jumper, blue jeans, glasses')." + seen,
                 {
                     "kind": {"description": "Best match", "required": True,
                              "selector": {"select": {"options": KINDS}}},
@@ -419,6 +445,10 @@ class Visitors:
                                     "selector": {"text": {}}},
                     "parcel": {"description": "Carrying or put down a parcel", "required": False,
                                "selector": {"boolean": {}}},
+                    "clothes": {"description": "What they wear, a few words", "required": False,
+                                "selector": {"text": {}}},
+                    "same_as": {"description": "Number of the earlier person this is, or 0", "required": False,
+                                "selector": {"number": {"min": 0, "max": len(earlier), "mode": "box"}}},
                 },
                 picture,
             )
@@ -433,7 +463,21 @@ class Visitors:
         kind = result.get("kind") if result.get("kind") in KINDS else "unknown"
         # the camera's own face recognition first; Sentient's when the camera couldn't name anyone
         name = self.recognised_name(trigger) or (face or {}).get("name")
-        household = self.is_household(name) or (not name and self.household_moving())
+        # the same clothes as someone earlier today: the same person again — once is enough
+        again = None
+        try:
+            index = int(result.get("same_as") or 0)
+        except (TypeError, ValueError):
+            index = 0
+        if kind != "nobody" and 1 <= index <= len(earlier):
+            again = earlier[index - 1]
+            if not name and again.get("name"):
+                name = again["name"]  # recognised once in these clothes: it's still them
+        household = (
+            self.is_household(name)
+            or (again is not None and bool(again.get("household")))
+            or (not name and self.household_moving())
+        )
         visit = {
             "name": name,
             "time": dt_util.now().isoformat(),
@@ -445,11 +489,15 @@ class Visitors:
             "place": place,
             "household": household,
             "face_id": (face or {}).get("id"),  # so "that was Kata" can teach this face afterwards
+            "clothes": (str(result.get("clothes") or "").strip().rstrip(".") or None) if kind != "nobody" else None,
+            "repeat": again is not None,
         }
         self.log.appendleft(visit)
         self._save()
-        if household:
-            return visit  # logged, but nobody needs telling that they themselves came home
+        if household or again is not None:
+            # logged, but nobody needs telling that they themselves came home, or about the same
+            # visitor walking past a second time
+            return visit
         if self.options.get(CONF_ANNOUNCE_VISITORS, DEFAULT_ANNOUNCE_VISITORS) and kind != "nobody":
             if place:
                 line = (t("visitors.named_at_place", name=name, place=place) if name

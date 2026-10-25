@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_NOTIFY_TARGETS, CONF_NOTIFY_WHEN, CONF_PERSONA, DEFAULT_NOTIFY_WHEN, DEFAULT_PERSONA
@@ -58,6 +59,7 @@ class Notifier:
         self.options = options
         self._sent: dict[str, datetime] = {}
         self._unsub = None
+        self.muted: set[str] = set()  # phones switched off with their "Notifications: <name>" switch
 
     @callback
     def async_start(self) -> None:
@@ -69,15 +71,42 @@ class Notifier:
             self._unsub()
             self._unsub = None
 
+    def owner(self, target: str) -> str | None:
+        """The person whose phone a notify entity is: the person tracked by a tracker on the same device."""
+        reg = er.async_get(self.hass)
+        entry = reg.async_get(target)
+        if entry is None or not entry.device_id:
+            return None
+        trackers = {e.entity_id for e in er.async_entries_for_device(reg, entry.device_id) if e.domain == "device_tracker"}
+        if not trackers:
+            return None
+        for person in self.hass.states.async_all("person"):
+            if trackers & set(person.attributes.get("device_trackers") or []):
+                return person.entity_id
+        return None
+
+    def at_home(self, target: str) -> bool:
+        person = self.owner(target)
+        st = self.hass.states.get(person) if person else None
+        return st is not None and st.state == "home"
+
     @callback
     def _item(self, event: Event) -> None:
-        targets = [t for t in self.options.get(CONF_NOTIFY_TARGETS) or [] if self.hass.states.get(t)]
+        targets = [
+            t for t in self.options.get(CONF_NOTIFY_TARGETS) or []
+            if self.hass.states.get(t) and t not in self.muted
+        ]
         if not targets:
             return
         kinds = set(self.options.get(CONF_NOTIFY_WHEN, DEFAULT_NOTIFY_WHEN) or [])
         title = wanted(event.data, kinds)
         if title is None:
             return
+        if event.data.get("kind") == "visitor":
+            # whoever is at home hears it from the speakers; phones are for those who are out
+            targets = [t for t in targets if not self.at_home(t)]
+            if not targets:
+                return
         text = event.data.get("text", "")
         now = dt_util.utcnow()
         self._sent = {k: v for k, v in self._sent.items() if now - v < _REPEAT}
