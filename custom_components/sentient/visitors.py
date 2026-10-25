@@ -439,6 +439,8 @@ class Visitors:
                 "down a parcel or package. In clothes, describe what they wear in a few words, colours "
                 "first (e.g. 'brown jumper, blue jeans, glasses')." + seen,
                 {
+                    "person": {"description": "True if any person is visible at all", "required": True,
+                               "selector": {"boolean": {}}},
                     "kind": {"description": "Best match", "required": True,
                              "selector": {"select": {"options": KINDS}}},
                     "description": {"description": "A few plain words", "required": True,
@@ -461,6 +463,14 @@ class Visitors:
         finally:
             self._busy = False
         kind = result.get("kind") if result.get("kind") in KINDS else "unknown"
+        # smaller local models sometimes describe a person yet pick "nobody": the plain yes/no wins
+        visible = result.get("person")
+        if isinstance(visible, str):
+            visible = visible.strip().lower() in {"true", "yes", "igen"}
+        if visible is True and kind == "nobody":
+            kind = "unknown"
+        elif visible is False:
+            kind = "nobody"
         # the camera's own face recognition first; Sentient's when the camera couldn't name anyone
         name = self.recognised_name(trigger) or (face or {}).get("name")
         # the same clothes as someone earlier today: the same person again — once is enough

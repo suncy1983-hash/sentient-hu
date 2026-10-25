@@ -125,3 +125,13 @@ async def test_phones_only_for_who_is_out_and_a_switch_per_phone(hass: HomeAssis
     hass.bus.async_fire("sentient_timeline", {"kind": "critical", "text": "Water leak under the sink"})
     await hass.async_block_till_done()
     assert sent[-1].data["entity_id"] == ["notify.sanya_phone"]  # critical goes to everyone switched on
+
+
+async def test_a_visible_person_is_never_nobody(hass: HomeAssistant) -> None:
+    entry, _ai = await _setup(hass, [
+        {"person": True, "kind": "nobody", "description": "Someone running past the gate", "clothes": "white top"},
+    ])
+    said = async_mock_service(hass, "assist_satellite", "announce")
+    await _walk_past(hass, entry)
+    assert entry.runtime_data.visitors.log[0]["kind"] == "unknown"
+    assert len(said) == 1
