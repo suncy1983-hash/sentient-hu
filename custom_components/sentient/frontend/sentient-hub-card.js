@@ -19,6 +19,17 @@
   if (customElements.get("sentient-hub-card")) return;
   const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const hm = (d) => (d && !isNaN(d) ? d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
+  // labels follow Home Assistant's language: Hungarian when it is set to Hungarian, English otherwise
+  const HU = {
+    DISCO: "DISZKÓ", PARTY: "BULI", RAINBOW: "SZIVÁRVÁNY", CHILL: "CHILL", HALLOWEEN: "HALLOWEEN", XMAS: "KARÁCSONY",
+    "STANDING BY": "KÉSZENLÉTBEN", LISTENING: "FIGYEL", THINKING: "GONDOLKODIK", SPEAKING: "BESZÉL",
+    PREPARING: "KÉSZÜL…", BRIEFING: "ÖSSZEFOGLALÓ", HUSHED: "NÉMÍTVA", HUSH: "NÉMÍTÁS", "GUESTS IN": "VENDÉGEK ITT", GUESTS: "VENDÉGEK",
+    "AT THE DOOR": "AZ AJTÓNÁL", SPOKEN: "ELHANGZOTT", WATCHING: "FIGYELÉS", PROBLEMS: "HIBA", HEALTH: "ÁLLAPOT", OK: "OK",
+    "Nothing yet today": "Ma még semmi", "Nothing said yet": "Még nem szólt semmit", "UP NEXT": "KÖVETKEZŐ",
+    FEED: "ESEMÉNYEK", ALL: "MIND", OFF: "KI", MEM: "MEM", DSK: "LEMEZ", Open: "Megnyitás",
+  };
+  let lang = "en";
+  const L = (t) => (lang === "hu" && HU[t] != null ? HU[t] : t);
   const KEYS = ["last_spoken", "likely_room", "watches", "visitors", "health", "hush", "guest_mode", "party_mode"];
   const SHOWS = {
     disco: ["mdi:party-popper", "DISCO"], party: ["mdi:glass-cocktail", "PARTY"], rainbow: ["mdi:looks", "RAINBOW"],
@@ -138,6 +149,7 @@
     _draw() {
       const h = this._hass;
       if (!h) return;
+      lang = String((h.locale && h.locale.language) || h.language || "en").slice(0, 2);
       if (!this.shadowRoot) {
         this.attachShadow({ mode: "open" });
         this.shadowRoot.addEventListener("click", (e) => this._click(e));
@@ -146,7 +158,7 @@
       const states = nodes.map((n) => (S[n.entity] || {}).state);
       const live = states.map((s) => LIVE[s]).find(Boolean);
       const mode = live || "idle";
-      const label = { idle: "STANDING BY", listen: "LISTENING", think: "THINKING", speak: "SPEAKING" }[mode];
+      const label = L({ idle: "STANDING BY", listen: "LISTENING", think: "THINKING", speak: "SPEAKING" }[mode]);
       const said = this._st("last_spoken");
       const saidText = said && !["unknown", "unavailable", ""].includes(said.state) ? said.state : "";
       const room = String((this._st("likely_room") || {}).state || "").toLowerCase();
@@ -166,7 +178,7 @@
       const showOn = on(party), showStyle = party && party.attributes.style;
       const shows = party ? (party.attributes.buttons || []).filter((s) => SHOWS[s]) : [];
       if (showOn && SHOWS[showStyle] && !shows.includes(showStyle)) shows.push(showStyle);
-      const btn = (act, id, icon, text, lit) => `<button class="q${lit ? " lit" : ""}" data-act="${act}" data-id="${esc(id || "")}"><ha-icon icon="${icon}"></ha-icon><span>${text}</span></button>`;
+      const btn = (act, id, icon, text, lit) => `<button class="q${lit ? " lit" : ""}" data-act="${act}" data-id="${esc(id || "")}"><ha-icon icon="${icon}"></ha-icon><span>${L(text)}</span></button>`;
       const quick = [
         btn("brief", "", "mdi:text-box-outline", this._briefing ? "PREPARING" : "BRIEFING", this._briefing),
         hush ? btn("toggle", hush.entity_id, on(hush) ? "mdi:volume-off" : "mdi:volume-high", on(hush) ? "HUSHED" : "HUSH", on(hush)) : "",
@@ -181,18 +193,18 @@
       const saidCount = todays.filter((i) => i.kind === "said").length;
       const vis = this._st("visitors"), w = this._st("watches"), hl = this._st("health");
       const problems = hl ? parseInt(hl.state, 10) || 0 : 0;
-      const tile = (icon, val, lbl, cls, more) => `<div class="tile ${cls || ""}"${more ? ` data-act="more" data-id="${esc(more)}"` : ""}><ha-icon icon="${icon}"></ha-icon><b>${esc(val)}</b><span>${lbl}</span></div>`;
+      const tile = (icon, val, lbl, cls, more) => `<div class="tile ${cls || ""}"${more ? ` data-act="more" data-id="${esc(more)}"` : ""}><ha-icon icon="${icon}"></ha-icon><b>${esc(L(String(val)))}</b><span>${L(lbl)}</span></div>`;
       const tiles = tile("mdi:doorbell-video", vis ? vis.state : "–", "AT THE DOOR", "", vis && vis.entity_id)
         + tile("mdi:message-text-outline", saidCount, "SPOKEN", "")
         + tile("mdi:radar", w ? w.state : "0", "WATCHING", w && +w.state ? "on" : "", w && w.entity_id)
         + tile(problems ? "mdi:alert-outline" : "mdi:shield-check-outline", problems ? problems : "OK", problems ? "PROBLEMS" : "HEALTH", problems ? "warn" : "ok", hl && hl.entity_id);
 
       // feed: the latest few, one line each
-      const feed = (this._items || []).filter((i) => FEED[i.kind] && !(i.kind === "noticed" && /decided it wasn't worth/.test(i.detail || "")))
+      const feed = (this._items || []).filter((i) => FEED[i.kind] && !(i.kind === "noticed" && /decided it wasn't worth|nem tartotta érdemesnek/.test(i.detail || "")))
         .slice(0, this._rows).map((i) => {
           const [icon, col] = FEED[i.kind];
           return `<div class="fr${i.alert ? " alert" : ""}"><ha-icon icon="${icon}" style="color:${col}"></ha-icon><span>${esc(i.text)}</span><em>${hm(new Date(i.time))}</em></div>`;
-        }).join("") || '<div class="fr dim"><span>Nothing yet today</span></div>';
+        }).join("") || `<div class="fr dim"><span>${L("Nothing yet today")}</span></div>`;
 
       // vitals
       const sys = this._sys(), num = (id) => { const v = parseFloat((S[id] || {}).state); return isNaN(v) ? null : v; };
@@ -200,7 +212,7 @@
       const bar = (n, v, warn, crit) => {
         if (v == null) return;
         const c = v < 0 ? "crit" : v >= crit ? "crit" : v >= warn ? "warn" : "";
-        bars.push(`<div class="m ${c}"><span>${n}</span><div class="b"><i style="width:${Math.max(0, Math.min(100, v))}%"></i></div><em>${v < 0 ? "OFF" : Math.round(v) + "%"}</em></div>`);
+        bars.push(`<div class="m ${c}"><span>${L(n)}</span><div class="b"><i style="width:${Math.max(0, Math.min(100, v))}%"></i></div><em>${v < 0 ? L("OFF") : Math.round(v) + "%"}</em></div>`);
       };
       bar("CPU", sys.cpu && num(sys.cpu), 60, 80);
       let mem = sys.memory && num(sys.memory);
@@ -211,7 +223,7 @@
       const temp = sys.temperature && num(sys.temperature);
       let up = "";
       const boot = sys.boot && S[sys.boot] ? new Date(S[sys.boot].state) : null;
-      if (boot && !isNaN(boot)) { const ms = Date.now() - boot; up = `UP ${Math.floor(ms / 864e5)}d ${Math.floor((ms % 864e5) / 36e5)}h`; }
+      if (boot && !isNaN(boot)) { const ms = Date.now() - boot; up = lang === "hu" ? `ÜZEMBEN ${Math.floor(ms / 864e5)} n ${Math.floor((ms % 864e5) / 36e5)} ó` : `UP ${Math.floor(ms / 864e5)}d ${Math.floor((ms % 864e5) / 36e5)}h`; }
 
       const fixed = parseInt(this._cfg.height, 10);
       this.shadowRoot.innerHTML = `<style>${CSS}</style>
@@ -219,17 +231,17 @@
           <div class="top"><span>${up}</span><span class="dots">${nodes.map((_, i) => `<i class="${LIVE[states[i]] || (states[i] === "unavailable" ? "off" : "")}"></i>`).join("")}</span>
             <span class="${temp >= 75 ? "hot" : temp >= 60 ? "warm" : ""}">${temp != null ? Math.round(temp) + "°C" : ""}</span></div>
           <div class="mid">
-            <button class="orb ${mode}" data-act="open" title="Open"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
+            <button class="orb ${mode}" data-act="open" title="${L("Open")}"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
               <span class="nuc"><ha-icon icon="${mode === "speak" ? "mdi:waveform" : mode === "think" ? "mdi:dots-horizontal" : "mdi:microphone"}"></ha-icon></span></button>
             <div class="info"><div class="st">${label}</div>
-              <div class="said">${saidText ? "“" + esc(saidText) + "”" : "<i>Nothing said yet</i>"}</div>
+              <div class="said">${saidText ? "“" + esc(saidText) + "”" : `<i>${L("Nothing said yet")}</i>`}</div>
               ${said && saidText ? `<div class="when">${hm(new Date(said.last_changed))}</div>` : ""}</div>
           </div>
           <div class="nodes">${nodeHtml}</div>
           <div class="quick">${quick}</div>
-          ${next ? `<div class="next"><ha-icon icon="${next.icon}"></ha-icon><span class="nl">UP NEXT</span><span class="nt">${esc(next.text)}</span><em>${next.t.toDateString() === new Date().toDateString() ? hm(next.t) : next.t.toLocaleDateString("en-GB", { weekday: "short" }).toUpperCase() + " " + hm(next.t)}</em></div>` : ""}
+          ${next ? `<div class="next"><ha-icon icon="${next.icon}"></ha-icon><span class="nl">${L("UP NEXT")}</span><span class="nt">${esc(next.text)}</span><em>${next.t.toDateString() === new Date().toDateString() ? hm(next.t) : next.t.toLocaleDateString(lang === "hu" ? "hu-HU" : "en-GB", { weekday: "short" }).toUpperCase() + " " + hm(next.t)}</em></div>` : ""}
           <div class="tiles">${tiles}</div>
-          <div class="fh"><span>FEED</span><i></i><button class="more" data-act="feed">ALL</button></div>
+          <div class="fh"><span>${L("FEED")}</span><i></i><button class="more" data-act="feed">${L("ALL")}</button></div>
           <div class="feed">${feed}</div>
           ${bars.length ? `<div class="sys">${bars.join("")}</div>` : ""}
         </ha-card>`;

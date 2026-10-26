@@ -8,6 +8,10 @@
     disco: ["mdi:party-popper", "Disco"], party: ["mdi:glass-cocktail", "Party"], rainbow: ["mdi:looks", "Rainbow"],
     chill: ["mdi:weather-night", "Chill"], halloween: ["mdi:halloween", "Halloween"], christmas: ["mdi:pine-tree", "Christmas"],
   };
+  const HU = { Disco: "Diszkó", Party: "Buli", Rainbow: "Szivárvány", Chill: "Chill", Halloween: "Halloween", Christmas: "Karácsony",
+    "LIGHT SHOWS": "FÉNYSHOW", TILL: "EDDIG:", ON: "BE", stop: "állj" };
+  let lang = "en";
+  const L = (t) => (lang === "hu" && HU[t] != null ? HU[t] : t);
   const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   class SentientShowsCard extends HTMLElement {
@@ -24,6 +28,7 @@
 
     set hass(hass) {
       this._hass = hass;
+      lang = String((hass.locale && hass.locale.language) || hass.language || "en").slice(0, 2);
       const st = this._switch(hass);
       const sig = st ? `${st.state}|${st.attributes.style}|${(st.attributes.buttons || []).join(",")}|${st.attributes.until}|${st.attributes.following_sound}` : "none";
       if (sig === this._sig) return;
@@ -55,11 +60,11 @@
         button.halloween.on{background:#ff8a1f;border-color:#ff8a1f;box-shadow:0 0 16px rgba(255,138,31,.55)}
         button.christmas.on{background:#ff4d5e;border-color:#ff4d5e;box-shadow:0 0 16px rgba(255,77,94,.55)}
       </style><ha-card>
-        <div class="h"><ha-icon icon="mdi:party-popper"></ha-icon>${esc(this._config.title || "LIGHT SHOWS")}
-          <span>${on ? `${st.attributes.following_sound ? "♪ " : ""}${until ? "TILL " + until : "ON"}` : ""}</span></div>
+        <div class="h"><ha-icon icon="mdi:party-popper"></ha-icon>${esc(this._config.title || L("LIGHT SHOWS"))}
+          <span>${on ? `${st.attributes.following_sound ? "♪ " : ""}${until ? L("TILL") + " " + until : L("ON")}` : ""}</span></div>
         <div class="b">${list.map((s) => {
           const lit = on && style === s;
-          return `<button class="${s}${lit ? " on" : ""}" data-s="${s}"><ha-icon icon="${SHOWS[s][0]}"></ha-icon>${SHOWS[s][1]}${lit ? " · stop" : ""}</button>`;
+          return `<button class="${s}${lit ? " on" : ""}" data-s="${s}"><ha-icon icon="${SHOWS[s][0]}"></ha-icon>${L(SHOWS[s][1])}${lit ? " · " + L("stop") : ""}</button>`;
         }).join("")}</div></ha-card>`;
       this.shadowRoot.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
         const s = b.dataset.s, cur = this._switch(this._hass);
