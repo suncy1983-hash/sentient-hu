@@ -29,7 +29,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .ai import ai_task_entity
+from .ai import ai_task_entity, async_generate
 from .const import (
     CONF_ANNOUNCE_VISITORS,
     CONF_DOOR_CAMERA,
@@ -401,9 +401,7 @@ class Visitors:
         }
         if ai_entity := ai_task_entity(self.hass, self.options):
             data["entity_id"] = ai_entity
-        response = await self.hass.services.async_call(
-            "ai_task", "generate_data", data, blocking=True, return_response=True
-        )
+        response = await async_generate(self.hass, data)
         result = (response or {}).get("data")
         return result if isinstance(result, dict) else {}
 

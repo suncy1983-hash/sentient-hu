@@ -22,7 +22,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.util import dt as dt_util
 
-from .ai import ai_task_entity
+from .ai import ai_task_entity, async_generate
 from .const import (
     CONF_BRIEFING_CALENDARS,
     CONF_BRIEFING_SECTIONS,
@@ -336,9 +336,7 @@ class Upkeep:
         if ai_entity := ai_task_entity(self.hass, rt.options):
             data["entity_id"] = ai_entity
         rt.watches.spend()
-        response = await self.hass.services.async_call(
-            "ai_task", "generate_data", data, blocking=True, return_response=True
-        )
+        response = await async_generate(self.hass, data)
         return (response or {}).get("data")
 
     # ----- briefing -------------------------------------------------------------

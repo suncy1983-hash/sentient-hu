@@ -17,7 +17,7 @@ from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
-from .ai import ai_task_entity
+from .ai import ai_task_entity, async_generate
 from . import i18n
 from .const import CONF_WELCOME, CONF_WELCOME_PEOPLE
 from .i18n import t
@@ -102,9 +102,7 @@ class Welcome:
                 data["entity_id"] = ai
             try:
                 rt.watches.spend()
-                response = await self.hass.services.async_call(
-                    "ai_task", "generate_data", data, blocking=True, return_response=True
-                )
+                response = await async_generate(self.hass, data)
                 text = str((response or {}).get("data") or "").strip()
                 if text:
                     message = text

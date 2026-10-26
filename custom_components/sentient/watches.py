@@ -29,7 +29,7 @@ from homeassistant.helpers.event import async_track_point_in_utc_time, async_tra
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .ai import ai_task_entity
+from .ai import ai_task_entity, async_generate
 from . import i18n
 from .i18n import t
 from .const import (
@@ -501,9 +501,7 @@ class WatchManager:
         }
         if ai_entity := ai_entity or ai_task_entity(self.hass, self.options):
             data["entity_id"] = ai_entity
-        response = await self.hass.services.async_call(
-            "ai_task", "generate_data", data, blocking=True, return_response=True
-        )
+        response = await async_generate(self.hass, data)
         result = (response or {}).get("data") or {}
         if isinstance(result, str):  # model ignored the structure
             return result.strip().lower().startswith(("yes", "true")), None, False
@@ -556,9 +554,7 @@ class WatchManager:
             data["entity_id"] = ai_entity
         self.spend()  # someone asked, so always look; it still counts towards today's total
         self._save()
-        response = await self.hass.services.async_call(
-            "ai_task", "generate_data", data, blocking=True, return_response=True
-        )
+        response = await async_generate(self.hass, data)
         answer = (response or {}).get("data")
         return {"camera": self.hass.states.get(entity_id).name, "answer": str(answer or "").strip()}
 

@@ -26,7 +26,7 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
-from .ai import ai_task_entity
+from .ai import ai_task_entity, async_generate
 from .const import (
     CONF_CHATTINESS,
     CONF_HOUSE_RULES,
@@ -314,8 +314,6 @@ class Noticer:
         }
         if ai_entity := ai_task_entity(self.hass, self.options):
             data["entity_id"] = ai_entity
-        response = await self.hass.services.async_call(
-            "ai_task", "generate_data", data, blocking=True, return_response=True
-        )
+        response = await async_generate(self.hass, data)
         result = (response or {}).get("data") or {}
         return result if isinstance(result, dict) else {}
