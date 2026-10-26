@@ -12,9 +12,32 @@ from homeassistant.helpers import selector
 
 from .const import (
     CONF_COMFORT_TEMP,
+    CONF_CAMSEC,
+    CONF_CAMSEC_DESCRIBE,
+    CONF_CAMSEC_ENTRIES,
+    CONF_CAMSEC_INSIDE,
+    CONF_CAMSEC_SENSORS,
+    CONF_PARTY_EXCLUDE,
+    CONF_PARTY_LIGHTS,
+    CONF_PARTY_MINUTES,
+    CONF_PARTY_SHOW,
+    CONF_PARTY_SOUND,
+    CONF_PARTY_SOUND_SWITCH,
+    CONF_PARTY_STYLE,
+    CONF_PARTY_WHOLE_HOUSE,
+    DEFAULT_PARTY_SHOW,
+    DEFAULT_PARTY_MINUTES,
+    DEFAULT_PARTY_STYLE,
+    PARTY_STYLES,
+    CONF_PERSONALITY,
+    CONF_PERSONALITY_NOTES,
+    DEFAULT_PERSONALITY,
+    PERSONALITIES,
     CONF_WARM_BY_WEEKDAYS,
     CONF_WARM_BY_WEEKENDS,
     CONF_HEATING_ENTITIES,
+    CONF_HEATING_LIMIT,
+    DEFAULT_HEATING_LIMIT,
     CONF_INSIDE_SENSORS,
     CONF_NIGHT_WATCH,
     CONF_NIGHT_WATCH_ANNOUNCE,
@@ -154,6 +177,9 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
                 selector.EntitySelectorConfig(domain="climate", multiple=True)
             ),
             vol.Required(CONF_PREHEAT, **d(CONF_PREHEAT, False)): selector.BooleanSelector(),
+            vol.Required(CONF_HEATING_LIMIT, **d(CONF_HEATING_LIMIT, DEFAULT_HEATING_LIMIT)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=24, step=0.5, unit_of_measurement="h", mode=selector.NumberSelectorMode.BOX)
+            ),
             vol.Optional(CONF_COMFORT_TEMP, **d(CONF_COMFORT_TEMP)): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=10, max=26, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.BOX)
             ),
@@ -169,6 +195,39 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Required(CONF_NIGHT_WATCH_ANNOUNCE, **d(CONF_NIGHT_WATCH_ANNOUNCE, False)): selector.BooleanSelector(),
             vol.Optional(CONF_NIGHT_WATCH_SPEAKERS, **d(CONF_NIGHT_WATCH_SPEAKERS, [])): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="assist_satellite", multiple=True)
+            ),
+            vol.Required(CONF_CAMSEC, **d(CONF_CAMSEC, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_CAMSEC_SENSORS, **d(CONF_CAMSEC_SENSORS, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+            ),
+            vol.Optional(CONF_CAMSEC_INSIDE, **d(CONF_CAMSEC_INSIDE, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+            ),
+            vol.Optional(CONF_CAMSEC_ENTRIES, **d(CONF_CAMSEC_ENTRIES, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["binary_sensor", "cover", "lock"], multiple=True)
+            ),
+            vol.Required(CONF_CAMSEC_DESCRIBE, **d(CONF_CAMSEC_DESCRIBE, True)): selector.BooleanSelector(),
+            vol.Required(CONF_PARTY_WHOLE_HOUSE, **d(CONF_PARTY_WHOLE_HOUSE, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_PARTY_LIGHTS, **d(CONF_PARTY_LIGHTS, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="light", multiple=True)
+            ),
+            vol.Optional(CONF_PARTY_EXCLUDE, **d(CONF_PARTY_EXCLUDE, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="light", multiple=True)
+            ),
+            vol.Required(CONF_PARTY_STYLE, **d(CONF_PARTY_STYLE, DEFAULT_PARTY_STYLE)): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=PARTY_STYLES, translation_key="party_style")
+            ),
+            vol.Required(CONF_PARTY_MINUTES, **d(CONF_PARTY_MINUTES, DEFAULT_PARTY_MINUTES)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=600, step=5, unit_of_measurement="min", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_PARTY_SOUND, **d(CONF_PARTY_SOUND)): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            vol.Optional(CONF_PARTY_SOUND_SWITCH, **d(CONF_PARTY_SOUND_SWITCH)): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="switch")
+            ),
+            vol.Optional(CONF_PARTY_SHOW, **d(CONF_PARTY_SHOW, DEFAULT_PARTY_SHOW)): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=PARTY_STYLES, multiple=True, mode=selector.SelectSelectorMode.LIST, translation_key="party_style")
             ),
             vol.Required(CONF_WEEKLY_REPORT, **d(CONF_WEEKLY_REPORT, DEFAULT_WEEKLY_REPORT)): selector.BooleanSelector(),
             vol.Required(CONF_ENERGY, **d(CONF_ENERGY, True)): selector.BooleanSelector(),
@@ -199,6 +258,12 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
             ),
             vol.Optional(CONF_NOTICE_ENTITIES, **d(CONF_NOTICE_ENTITIES, [])): selector.EntitySelector(
                 selector.EntitySelectorConfig(multiple=True)
+            ),
+            vol.Required(CONF_PERSONALITY, **d(CONF_PERSONALITY, DEFAULT_PERSONALITY)): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=list(PERSONALITIES), translation_key="personality")
+            ),
+            vol.Optional(CONF_PERSONALITY_NOTES, **d(CONF_PERSONALITY_NOTES, "")): selector.TextSelector(
+                selector.TextSelectorConfig(multiline=True)
             ),
             vol.Required(CONF_CHATTINESS, **d(CONF_CHATTINESS, DEFAULT_CHATTINESS)): selector.SelectSelector(
                 selector.SelectSelectorConfig(options=list(CHATTINESS_LIMITS), translation_key="chattiness")

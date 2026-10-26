@@ -1,4 +1,4 @@
-"""Switches: hush the house for a while, and guest mode."""
+"""Switches: hush the house for a while, guest mode, the chime and disco mode."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: SentientConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     phones = [NotifyTargetSwitch(hass, entry, target) for target in entry.runtime_data.options.get(CONF_NOTIFY_TARGETS) or []]
-    async_add_entities([HushSwitch(entry), GuestSwitch(entry), ChimeSwitch(entry), AnnounceVisitorsSwitch(entry), *phones])
+    async_add_entities([HushSwitch(entry), GuestSwitch(entry), ChimeSwitch(entry), PartySwitch(entry), AnnounceVisitorsSwitch(entry), *phones])
 
 
 class NotifyTargetSwitch(SwitchEntity, RestoreEntity):
@@ -208,6 +208,38 @@ class AnnounceVisitorsSwitch(_ModeSwitch):
         visitors = entry.runtime_data.visitors
         visitors.options = {**visitors.options, CONF_ANNOUNCE_VISITORS: on}
         self.async_write_ha_state()
+class PartySwitch(_ModeSwitch):
+    """Light show: the chosen lights put on a show, then go back as they were."""
+
+    _attr_icon = "mdi:party-popper"
+
+    def __init__(self, entry: SentientConfigEntry) -> None:
+        super().__init__(entry, "party_mode")
+
+    @property
+    def is_on(self) -> bool:
+        return self._entry.runtime_data.party.active
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        party = self._entry.runtime_data.party
+        return {
+            "style": party.style if party.active else None,
+            "until": party.until.isoformat() if party.active and party.until else None,
+            "lights": list(party.lights) if party.active else [],
+            "following_sound": party.listening,
+            "buttons": list(party.options.get("party_show", ["disco"]) or []),
+        }
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        result = await self._entry.runtime_data.party.async_party()
+        if result.get("error"):
+            from homeassistant.exceptions import HomeAssistantError
+
+            raise HomeAssistantError(result["error"])
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self._entry.runtime_data.party.async_end()
 
 
 _HUSH_TIMERS: dict[str, Any] = {}

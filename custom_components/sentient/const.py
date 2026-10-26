@@ -143,6 +143,8 @@ CONF_COMFORT_TEMP = "comfort_temp"
 CONF_INSIDE_SENSORS = "inside_sensors"
 CONF_WARM_BY_WEEKDAYS = "warm_by_weekdays"
 CONF_WARM_BY_WEEKENDS = "warm_by_weekends"
+CONF_HEATING_LIMIT = "heating_limit"
+DEFAULT_HEATING_LIMIT = 3
 
 # night watch
 CONF_NIGHT_WATCH = "night_watch"
@@ -154,3 +156,43 @@ DEFAULT_NIGHT_WATCH = True
 # weekly report
 CONF_WEEKLY_REPORT = "weekly_report"
 DEFAULT_WEEKLY_REPORT = True
+
+# personality
+CONF_PERSONALITY = "personality"
+CONF_PERSONALITY_NOTES = "personality_notes"
+DEFAULT_PERSONALITY = "calm"
+PERSONALITIES = {
+    "calm": "calm, warm and to the point",
+    "dry": "quietly witty, with dry, understated British humour now and then — the answer always comes first, and never a joke about safety, security or anything upsetting",
+    "warm": "warm and friendly, like a kind member of the family who's glad to help",
+    "cheeky": "cheeky and playful, with light banter and the odd tease — but plain and serious about safety, security or anything upsetting",
+    "composed": "polite and composed, like a capable butler, never stiff and never using titles",
+}
+
+
+def personality_line(options: dict) -> str:
+    """One sentence about how the house should sound, for every prompt."""
+    style = PERSONALITIES.get(options.get(CONF_PERSONALITY) or DEFAULT_PERSONALITY, PERSONALITIES[DEFAULT_PERSONALITY])
+    notes = (options.get(CONF_PERSONALITY_NOTES) or "").strip()
+    return f"Your personality: {style}." + (f" {notes}" if notes else "")
+
+# camera security
+CONF_CAMSEC = "camera_security"
+CONF_CAMSEC_SENSORS = "camera_security_sensors"
+CONF_CAMSEC_INSIDE = "camera_security_inside"
+CONF_CAMSEC_ENTRIES = "camera_security_entries"
+CONF_CAMSEC_DESCRIBE = "camera_security_describe"
+
+# Disco mode
+CONF_PARTY_LIGHTS = "party_lights"
+CONF_PARTY_STYLE = "party_style"
+CONF_PARTY_MINUTES = "party_minutes"
+DEFAULT_PARTY_STYLE = "disco"
+DEFAULT_PARTY_MINUTES = 60
+PARTY_STYLES = ["disco", "party", "rainbow", "chill", "halloween", "christmas"]
+CONF_PARTY_WHOLE_HOUSE = "party_whole_house"
+CONF_PARTY_EXCLUDE = "party_exclude"
+CONF_PARTY_SOUND = "party_sound"
+CONF_PARTY_SOUND_SWITCH = "party_sound_switch"
+CONF_PARTY_SHOW = "party_show"
+DEFAULT_PARTY_SHOW = ["disco"]

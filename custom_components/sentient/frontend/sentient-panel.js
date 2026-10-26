@@ -5,7 +5,7 @@
 (() => {
   if (customElements.get("sentient-panel")) return;
 
-  const KEYS = ["memories", "last_spoken", "likely_room", "watches", "routines", "visitors", "health", "hush", "guest_mode", "chime"];
+  const KEYS = ["memories", "last_spoken", "likely_room", "watches", "routines", "visitors", "health", "hush", "guest_mode", "chime", "party_mode"];
   const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const hm = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); };
   const day = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); };
@@ -172,7 +172,7 @@
       R("head").innerHTML = `<img src="/sentient_static/logo.png" alt="">
         <div class="m"><div class="ti">${esc(persona).toUpperCase()}</div>
           <div class="sub">${this._attr("likely_room", "quiet_hours") ? "QUIET HOURS" : "AWAKE"} · PEOPLE IN ${esc(room.state).toUpperCase()} · ${this._attr("likely_room", "ai_checks_today", 0)} AI CHECKS TODAY</div>
-          <div class="modes">${this._modeChip("hush", "mdi:volume-off", "HUSH 1 HOUR", "HUSHED")}${this._modeChip("guest_mode", "mdi:account-multiple", "GUEST MODE", "GUESTS IN")}${this._chimeChip()}${(this._sc || []).map((r) => `<button class="mode run" data-act="scrun" data-id="${esc(r.id)}"><ha-icon icon="mdi:play-circle-outline"></ha-icon>${esc(r.name).toUpperCase()}</button>`).join("")}</div>
+          <div class="modes">${this._modeChip("hush", "mdi:volume-off", "HUSH 1 HOUR", "HUSHED")}${this._modeChip("guest_mode", "mdi:account-multiple", "GUEST MODE", "GUESTS IN")}${this._showChips()}${this._chimeChip()}${(this._sc || []).map((r) => `<button class="mode run" data-act="scrun" data-id="${esc(r.id)}"><ha-icon icon="mdi:play-circle-outline"></ha-icon>${esc(r.name).toUpperCase()}</button>`).join("")}</div>
           <div class="st">${stat(st("memories"), "MEMORIES ›", "memories")}${stat(st("watches"), "WATCHING")}${stat(st("routines"), "ROUTINES")}${stat(st("visitors"), "VISITORS TODAY")}${stat(st("health"), "PROBLEMS")}</div></div>
         <div class="rm"><div class="t">WHERE PEOPLE ARE</div>${bars || '<div class="b">NO RECENT MOTION</div>'}</div>`;
 
@@ -258,6 +258,7 @@
       this._loadMotion();
       this._loadMutes(true);
       this._loadShortcuts();
+      ["alarms", "offers", "announce", "checks"].forEach((k) => this._loadItems(k));
       if (!this._settings && !this._settingsErr) {
         try {
           this._settings = await this._hass.callWS({ type: "sentient/settings", language: this._hass.language });
@@ -269,19 +270,52 @@
       this._drawBody();
     }
 
+    _phone() { return window.matchMedia("(max-width: 720px)").matches; }
+
     _drawSide() {
       const groups = (this._settings && this._settings.groups) || [];
-      const item = (id, icon, title, sub) =>
-        `<button class="nav${this._group === id ? " on" : ""}" data-act="group" data-id="${id}"><ha-icon icon="${icon}"></ha-icon><span><b>${esc(title)}</b>${sub ? `<i>${esc(sub)}</i>` : ""}</span></button>`;
+      const n = (k) => (this._it && this._it[k] ? this._it[k].items.length : null);
       const count = this._memories ? this._memories.length : this._st("memories") ? this._st("memories").state : "";
-      this._$("side").innerHTML = `<div class="sh">SETTINGS</div>` + item("memories", "mdi:brain", "Memories", count !== "" ? `${count} remembered` : "")
-        + item("spots", "mdi:selection-marker", "Camera spots", this._spots ? `${this._spots.length} taught` : "Named areas the AI zooms into")
-        + item("shortcuts", "mdi:playlist-play", "Routines", this._sc ? `${this._sc.length} · goodnight, morning…` : "Goodnight, good morning…")
-        + item("mutes", "mdi:volume-mute", "Shushed", this._mutes ? `${this._mutes.length} muted` : "Things it won't mention")
-        + item("motion", "mdi:motion-sensor", "Motion lights", this._ml ? `${this._ml.rules.length} light${this._ml.rules.length === 1 ? "" : "s"} · after dark` : "Lights that follow movement")
-        + groups.map((g) => item(g.id, g.icon, g.title, g.blurb)).join("")
-        + item("backup", "mdi:backup-restore", "Backup", "Download or restore everything")
-        + (this._settingsErr ? `<div class="note">${esc(this._settingsErr)}</div>` : "");
+      // Every page the Settings tab has: id -> [icon, title, short line]
+      const pages = {
+        memories: ["mdi:brain", "Memories", count !== "" ? `${count} remembered` : ""],
+        mutes: ["mdi:volume-mute", "Shushed", this._mutes ? `${this._mutes.length} muted` : "Things it won't mention"],
+        spots: ["mdi:selection-marker", "Camera spots", this._spots ? `${this._spots.length} taught` : "Named areas the AI zooms into"],
+        shortcuts: ["mdi:playlist-play", "Routines", this._sc ? `${this._sc.length} · goodnight, morning…` : "Goodnight, good morning…"],
+        motion: ["mdi:motion-sensor", "Motion lights", this._ml ? `${this._ml.rules.length} light${this._ml.rules.length === 1 ? "" : "s"} · after dark` : "Lights that follow movement"],
+        alarms: ["mdi:alarm", "Alarms", n("alarms") !== null ? `${n("alarms")} set` : "Alarms, appointments, routines"],
+        offers: ["mdi:hand-heart-outline", "Offers", n("offers") !== null ? `${n("offers")} · fancy a brew?` : "Questions it asks — a brew?"],
+        announce: ["mdi:bullhorn-outline", "Announcements", n("announce") !== null ? `${n("announce")} · doorbell, gate` : "Doorbell, gate…"],
+        checks: ["mdi:cctv", "Camera checks", n("checks") !== null ? `${n("checks")} watching` : "Delivery van outside?"],
+        backup: ["mdi:backup-restore", "Backup", "Download or restore everything"],
+      };
+      groups.forEach((g) => { pages[g.id] = [g.icon, g.title, g.blurb]; });
+      // The menus, in order; anything not listed lands in the last one
+      const menus = [
+        ["voice", "mdi:account-voice", "Voice & sound", ["voice", "quiet", "announce", "offers", "mutes", "briefing", "phone"]],
+        ["cameras", "mdi:cctv", "Cameras & video", ["door", "spots", "checks", "camsec"]],
+        ["security", "mdi:shield-home", "Security & safety", ["nightwatch", "safety", "health"]],
+        ["home", "mdi:home-automation", "Home & routines", ["shortcuts", "alarms", "motion", "party", "heating", "energy"]],
+        ["brain", "mdi:brain", "Brain & system", ["memories", "noticing", "page", "backup"]],
+      ];
+      const placed = new Set(menus.flatMap((m) => m[3]));
+      Object.keys(pages).forEach((id) => { if (!placed.has(id)) menus[menus.length - 1][3].push(id); });
+      const mine = menus.find((m) => m[3].includes(this._group));
+      if (!this._openMenus) this._openMenus = new Set();
+      if (mine && this._menuFor !== this._group) { this._menuFor = this._group; if (!this._phone()) this._openMenus.add(mine[0]); }
+      const item = (id) => {
+        const [icon, title, sub] = pages[id];
+        return `<button class="nav${this._group === id ? " on" : ""}" data-act="group" data-id="${id}"><ha-icon icon="${icon}"></ha-icon><span><b>${esc(title)}</b>${sub ? `<i>${esc(sub)}</i>` : ""}</span></button>`;
+      };
+      this._$("side").innerHTML = `<div class="sh">SETTINGS</div>` + menus.map(([mid, icon, title, ids]) => {
+        const list = ids.filter((id) => pages[id]);
+        if (!list.length) return "";
+        const open = this._openMenus.has(mid);
+        const here = mine && mine[0] === mid;
+        return `<div class="menu${open ? " open" : ""}${here ? " here" : ""}">
+          <button class="mh" data-act="menu" data-id="${mid}" aria-expanded="${open}"><ha-icon icon="${icon}"></ha-icon><span>${esc(title)}</span><u>${list.length}</u><ha-icon class="chev" icon="mdi:chevron-down"></ha-icon></button>
+          <div class="mi">${list.map(item).join("")}</div></div>`;
+      }).join("") + (this._settingsErr ? `<div class="note">${esc(this._settingsErr)}</div>` : "");
     }
 
     async _loadMemories() {
@@ -302,6 +336,7 @@
       if (this._group === "mutes") { this._form = null; this._loadMutes(); return; }
       if (this._group === "shortcuts") { this._form = null; this._loadShortcuts(); return; }
       if (this._group === "backup") { this._form = null; this._drawBackup(); return; }
+      if (["alarms", "offers", "announce", "checks"].includes(this._group)) { this._form = null; this._itEdit = null; this._loadItems(this._group); return; }
       const g = this._settings && this._settings.groups.find((x) => x.id === this._group);
       if (!g) { this._group = "memories"; this._drawMemories(); return; }
       const body = this._$("body");
@@ -421,36 +456,58 @@
       }
       const here = spots.filter((sp) => sp.camera === this._cam);
       const box = (b, label, cls) => `<div class="box ${cls || ""}" style="left:${b[0] * 100}%;top:${b[1] * 100}%;width:${(b[2] - b[0]) * 100}%;height:${(b[3] - b[1]) * 100}%">${label ? `<span>${esc(label)}</span>` : ""}</div>`;
+      const poly = (pts, label, cls) => `<svg class="shape ${cls || ""}" viewBox="0 0 100 100" preserveAspectRatio="none"><polygon points="${pts.map((p) => `${p[0] * 100},${p[1] * 100}`).join(" ")}"/></svg>`
+        + (label ? `<div class="box lbl" style="left:${Math.min(...pts.map((p) => p[0])) * 100}%;top:${Math.min(...pts.map((p) => p[1])) * 100}%;width:0;height:0;border:0;box-shadow:none"><span>${esc(label)}</span></div>` : "");
+      const mark = (sp) => (sp.points && sp.points.length >= 3 ? poly(sp.points, sp.name) : box(sp.box, sp.name));
+      const pts = this._pts || [];
+      const draft = this._shape
+        ? (pts.length ? poly(pts, this._spName || "new spot", "new") + pts.map((p) => `<i class="dotp" style="left:${p[0] * 100}%;top:${p[1] * 100}%"></i>`).join("") : "")
+        : (this._draft_box ? box(this._draft_box, this._spName || "new spot", "new") : "");
+      const ready = this._shape ? pts.length >= 3 : !!this._draft_box;
       const body = this._$("body");
       body.innerHTML = `<div class="bh"><ha-icon icon="mdi:selection-marker"></ha-icon><div><div class="bt">CAMERA SPOTS</div>
-          <div class="bs">Name a part of a camera's picture — "the rabbit pen", "the drive". Watches and questions that mention it send the AI just that part: sharper answers, cheaper checks.</div></div></div>
+          <div class="bs">Name a part of a camera's picture — "the rabbit pen", "the drive" — and other names for it. Questions that mention it use the camera that can see it, and send the AI just that part. Draw a shape to leave out what's next to it (a neighbour's car).</div></div></div>
         <div class="spotgrid"><div>
           <div class="row"><select id="spcam">${cams.map((c) => `<option value="${c.id}"${c.id === this._cam ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
             <button class="btn ghost sm" data-act="snap">↻ NEW PICTURE</button></div>
           <div class="snap${this._drawing ? " drawing" : ""}" id="snap">${this._cam ? `<img src="${this._snapUrl(this._cam)}" alt="" draggable="false">` : '<div class="e">NO CAMERAS</div>'}
-            ${here.map((sp) => box(sp.box, sp.name)).join("")}${this._draft_box ? box(this._draft_box, this._spName || "new spot", "new") : ""}</div>
-          <div class="hint">${this._drawing ? "DRAG ON THE PICTURE TO MARK THE SPOT" : "TIP: “DRAW IT” LETS YOU MARK IT YOURSELF — NO AI NEEDED"}</div>
+            ${here.map(mark).join("")}${this._drawing ? draft : ""}</div>
+          <div class="hint">${this._drawing ? (this._shape ? "TAP EACH CORNER OF THE AREA, THEN SAVE" : "DRAG ON THE PICTURE TO MARK THE SPOT") : "TIP: “DRAW IT” LETS YOU MARK IT YOURSELF — NO AI NEEDED"}</div>
         </div><div>
           <div class="h"><span class="t">TEACH A SPOT</span><i></i></div>
-          <form class="add" data-form="spot"><ha-icon icon="mdi:tag-outline"></ha-icon><input name="name" id="spname" placeholder="Name, e.g. the rabbit pen" value="${esc(this._spName || "")}" autocomplete="off"></form>
+          <form class="add" data-form="spot"><ha-icon icon="mdi:tag-outline"></ha-icon><input name="name" id="spname" placeholder="Name, e.g. the drive" value="${esc(this._spName || "")}" autocomplete="off"></form>
+          <form class="add" data-form="spot"><ha-icon icon="mdi:tag-multiple-outline"></ha-icon><input name="aliases" id="spalias" placeholder="Also called, e.g. driveway, parking space" value="${esc(this._spAlias || "")}" autocomplete="off"></form>
           <div class="row"><button class="btn sm" data-act="spfind">FIND IT WITH AI</button>
             <button class="btn ghost sm" data-act="spdraw">${this._drawing ? "STOP DRAWING" : "DRAW IT"}</button>
-            ${this._drawing ? `<button class="btn sm" data-act="spsave" id="spsave"${this._draft_box ? "" : " disabled"}>SAVE SPOT</button>` : ""}</div>
+            ${this._drawing ? `<button class="btn ghost sm" data-act="spshape">${this._shape ? "BOX INSTEAD" : "SHAPE INSTEAD"}</button>` : ""}
+            ${this._drawing && this._shape && pts.length ? `<button class="btn ghost sm" data-act="spundo">UNDO POINT</button>` : ""}
+            ${this._drawing ? `<button class="btn sm" data-act="spsave" id="spsave"${ready ? "" : " disabled"}>SAVE SPOT</button>` : ""}</div>
           <div class="spmsg" id="spmsg">${esc(this._spMsg || "")}</div>
           <div class="h" style="margin-top:14px"><span class="t">ON THIS CAMERA</span><i></i><em>${here.length}</em></div>
-          ${here.map((sp) => `<div class="r"><ha-icon icon="mdi:selection-marker"></ha-icon><b>${esc(sp.name)}</b>
+          ${here.map((sp) => `<div class="r"><ha-icon icon="${sp.points ? "mdi:vector-polygon" : "mdi:selection-marker"}"></ha-icon><b>${esc(sp.name)}</b>
+              <input class="alias" data-alias="${esc(sp.name)}" value="${esc(sp.aliases || "")}" placeholder="also called…">
               <a class="x" data-act="spforget" data-id="${esc(sp.name)}" title="Forget">✕</a></div>`).join("") || '<div class="e">NONE YET</div>'}
           <div class="h" style="margin-top:14px"><span class="t">ASK THE CAMERA</span><i></i></div>
           <form class="add" data-form="look"><ha-icon icon="mdi:eye-outline"></ha-icon><input name="q" placeholder="${here[0] ? `Is anything in ${esc(here[0].name)}?` : "What can you see?"}" autocomplete="off">
             <select name="spot"><option value="">Whole picture</option>${here.map((sp) => `<option>${esc(sp.name)}</option>`).join("")}</select><button class="btn sm" type="submit">ASK</button></form>
           <div class="spmsg ans" id="spans">${esc(this._lookAns || "")}</div>
         </div></div>`;
-      this._$("spcam") && this._$("spcam").addEventListener("change", (ev) => { this._cam = ev.target.value; this._draft_box = null; this._lookAns = ""; this._drawSpots(); });
+      this._$("spcam") && this._$("spcam").addEventListener("change", (ev) => { this._cam = ev.target.value; this._draft_box = null; this._pts = []; this._lookAns = ""; this._drawSpots(); });
       const nm = this._$("spname");
       if (nm) nm.addEventListener("input", (ev) => { this._spName = ev.target.value; });
+      const al = this._$("spalias");
+      if (al) al.addEventListener("input", (ev) => { this._spAlias = ev.target.value; });
+      body.querySelectorAll("input.alias").forEach((inp) => inp.addEventListener("change", () => {
+        this._hass.callWS({ type: "sentient/spots/aliases", name: inp.dataset.alias, aliases: inp.value })
+          .then((r) => { this._spots = r.spots; }, (e) => window.alert(e.message || e));
+      }));
       const snap = this._$("snap");
       if (snap && this._drawing) {
         const pos = (ev) => { const r = snap.getBoundingClientRect(); return [Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height))]; };
+        if (this._shape) {
+          snap.addEventListener("pointerdown", (ev) => { ev.preventDefault(); this._pts = [...(this._pts || []), pos(ev)]; this._drawSpots(); });
+          return;
+        }
         snap.addEventListener("pointerdown", (ev) => { ev.preventDefault(); snap.setPointerCapture(ev.pointerId); this._dragFrom = pos(ev); });
         snap.addEventListener("pointermove", (ev) => {
           if (!this._dragFrom) return;
@@ -479,9 +536,12 @@
           this._spots = res.spots; this._spName = ""; say(`Found ${res.result.name}.`);
         } else if (kind === "save") {
           if (!name) return say("Give the spot a name first.");
-          if (!this._draft_box) return say("Drag on the picture to mark it first.");
-          const res = await this._hass.callWS({ type: "sentient/spots/set", camera: this._cam, name, box: this._draft_box });
-          this._spots = res.spots; this._spName = ""; this._draft_box = null; this._drawing = false; say(`Saved ${res.result.name}.`);
+          const pts = this._pts || [];
+          if (this._shape ? pts.length < 3 : !this._draft_box) return say(this._shape ? "Tap at least three corners first." : "Drag on the picture to mark it first.");
+          const req = { type: "sentient/spots/set", camera: this._cam, name, box: this._draft_box || [0, 0, 1, 1], aliases: this._spAlias || "" };
+          if (this._shape) req.points = pts;
+          const res = await this._hass.callWS(req);
+          this._spots = res.spots; this._spName = ""; this._spAlias = ""; this._draft_box = null; this._pts = []; this._drawing = false; say(`Saved ${res.result.name}.`);
         }
       } catch (e) { say(e.message || String(e)); }
       this._drawSide(); this._drawSpots();
@@ -536,6 +596,57 @@
         form.hass = this._hass; form.schema = schema; form.data = this._scDraft;
         form.computeLabel = (sc) => LABELS[sc.name] || sc.name;
         form.addEventListener("value-changed", (ev) => { this._scDraft = { ...ev.detail.value }; form.data = this._scDraft; });
+        fw.innerHTML = ""; fw.appendChild(form); this._form = form;
+      });
+    }
+
+    // ---------- alarms, offers, announcements, camera checks ----------
+    async _loadItems(kind, extra) {
+      this._it = this._it || {};
+      try { this._it[kind] = await this._hass.callWS({ type: "sentient/items", kind, ...(extra || {}) }); } catch (e) { this._it[kind] = { items: [], meta: null, err: e.message || String(e) }; }
+      if (this._view === "settings") { this._drawSide(); if (this._group === kind && !this._itEdit) this._drawItems(kind); }
+    }
+
+    _drawItems(kind) {
+      const data = (this._it || {})[kind];
+      const body = this._$("body");
+      if (!data || !data.meta) { body.innerHTML = `<div class="e">${esc((data && data.err) || "LOADING…")}</div>`; return; }
+      const m = data.meta;
+      const when = (it) => kind === "alarms" && it._next ? `<s>NEXT ${esc(new Date(it._next).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" }).toUpperCase())}</s>` : "";
+      const rows = data.items.map((it) => `<div class="card ml${it.enabled === false ? " off" : ""}"><div class="r"><ha-icon icon="${m.icon}"></ha-icon><b>${esc(it.name)}</b>${when(it)}
+            <label class="tg" title="On or off"><input type="checkbox" data-ittoggle="${esc(it.id)}"${it.enabled === false ? "" : " checked"}><i></i></label>
+            <button class="btn ghost sm" data-act="ittest" data-id="${esc(it.id)}">TRY</button>
+            <a class="x" data-act="itedit" data-id="${esc(it.id)}" title="Edit">✎</a><a class="x" data-act="itdel" data-id="${esc(it.id)}" data-text="${esc(it.name)}" title="Delete">✕</a></div>
+          <div class="mlsub">${esc(it._summary || "")}</div>${it.last_answer ? `<div class="hint">LAST: ${esc(it.last_answer).toUpperCase()}</div>` : ""}</div>`).join("");
+      body.innerHTML = `<div class="bh"><ha-icon icon="${m.icon}"></ha-icon><div><div class="bt">${esc(m.title).toUpperCase()}</div>
+          <div class="bs">${esc(m.blurb)}</div></div></div>
+        <div class="mllist">${rows || '<div class="e">NONE YET</div>'}</div><div id="itedit"></div>
+        <div class="bar"><span id="status"></span><button class="btn" data-act="itadd">${esc(m.add)}</button></div>`;
+      body.querySelectorAll("input[data-ittoggle]").forEach((cb) => cb.addEventListener("change", () => {
+        const it = data.items.find((x) => x.id === cb.dataset.ittoggle);
+        if (!it) return;
+        this._hass.callWS({ type: "sentient/items/save", kind, item: { ...it, enabled: cb.checked } })
+          .then((r) => { this._it[kind] = r; this._drawItems(kind); }, (e) => window.alert(e.message || e));
+      }));
+    }
+
+    _openItemForm(kind, item) {
+      const data = this._it[kind];
+      this._itEdit = item;
+      this._itDraft = { ...data.meta.defaults, ...item };
+      const wrap = this._$("itedit");
+      wrap.innerHTML = `<div class="card mlform"><div class="h"><span class="t">${item.id ? "EDIT" : "NEW"}</span><i></i></div>
+        <div id="itformwrap" class="formwrap"><div class="e">LOADING…</div></div>
+        <div class="row end"><span class="spmsg" id="itmsg"></span><button class="btn ghost sm" data-act="itcancel">CANCEL</button><button class="btn sm" data-act="itsave">SAVE</button></div></div>`;
+      wrap.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      loadForm().then((ok) => {
+        const fw = this._$("itformwrap");
+        if (!fw || this._itEdit !== item) return;
+        if (!ok) { fw.innerHTML = '<div class="e">THE FORM COULDN\'T LOAD · REFRESH THE PAGE</div>'; return; }
+        const form = document.createElement("ha-form");
+        form.hass = this._hass; form.schema = data.meta.schema; form.data = this._itDraft;
+        form.computeLabel = (sc) => data.meta.labels[sc.name] || sc.name;
+        form.addEventListener("value-changed", (ev) => { this._itDraft = { ...ev.detail.value }; form.data = this._itDraft; });
         fw.innerHTML = ""; fw.appendChild(form); this._form = form;
       });
     }
@@ -607,6 +718,22 @@
       const on = st.state === "on";
       const until = on && st.attributes.until ? ` · TILL ${hm(st.attributes.until)}` : "";
       return `<button class="mode${on ? " on" : ""}" data-act="mode" data-id="${esc(st.entity_id)}"><ha-icon icon="${icon}"></ha-icon>${on ? onLabel + until : offLabel}</button>`;
+    }
+
+    _showChips() {
+      const st = this._st("party_mode");
+      if (!st) return "";
+      const SHOWS = { disco: ["mdi:party-popper", "DISCO"], party: ["mdi:glass-cocktail", "PARTY"], rainbow: ["mdi:looks", "RAINBOW"],
+        chill: ["mdi:weather-night", "CHILL"], halloween: ["mdi:halloween", "HALLOWEEN"], christmas: ["mdi:pine-tree", "CHRISTMAS"] };
+      const on = st.state === "on", style = st.attributes.style;
+      const list = (st.attributes.buttons || []).filter((s) => SHOWS[s]);
+      if (on && style && !list.includes(style) && SHOWS[style]) list.push(style); // whatever is running can always be stopped here
+      return list.map((s) => {
+        const lit = on && style === s;
+        const until = lit && st.attributes.until ? ` · TILL ${hm(st.attributes.until)}` : "";
+        const ear = lit && st.attributes.following_sound ? ' <ha-icon icon="mdi:music-note"></ha-icon>' : "";
+        return `<button class="mode${lit ? " on" : ""}" data-act="show" data-id="${s}"><ha-icon icon="${SHOWS[s][0]}"></ha-icon>${SHOWS[s][1]}${lit ? " ON" + until : ""}${ear}</button>`;
+      }).join("");
     }
 
     _chimeChip() {
@@ -868,18 +995,32 @@
       else if (act === "unlearn") this._call("forget_routine", { routine: id }, `Delete this for good? It won't be learned or offered again.\n\n${text}`);
       else if (act === "unforget") this._call("forget_routine", { restore: true }, text);
       else if (act === "goto") { this._group = id; this._show("settings", true); }
-      else if (act === "group") {
+      else if (act === "menu") {
+        if (!this._openMenus) this._openMenus = new Set();
+        if (this._openMenus.has(id)) this._openMenus.delete(id); else this._openMenus.add(id);
+        this._drawSide();
+      } else if (act === "group") {
         if (this._dirty && !window.confirm("Leave without saving your changes?")) return;
-        this._dirty = false; this._group = id; this._editing = null; this._mlEdit = null; this._scEdit = null; this._drawSide(); this._drawBody();
+        this._dirty = false; this._group = id; this._editing = null; this._mlEdit = null; this._scEdit = null;
+        if (this._phone() && this._openMenus) this._openMenus.clear();
+        this._drawSide(); this._drawBody();
+        if (this._phone()) this._$("body").scrollIntoView({ behavior: "smooth", block: "start" });
       } else if (act === "save") this._save();
       else if (act === "reset") this._drawBody();
       else if (act === "edit") { this._editing = id; this._drawMemories(); }
       else if (act === "noedit") { this._editing = null; this._drawMemories(); }
       else if (act === "snap") { this._snapT = Date.now(); this._drawSpots(); }
-      else if (act === "spdraw") { this._drawing = !this._drawing; if (!this._drawing) this._draft_box = null; this._drawSpots(); }
+      else if (act === "spdraw") { this._drawing = !this._drawing; if (!this._drawing) { this._draft_box = null; this._pts = []; } this._drawSpots(); }
+      else if (act === "spshape") { this._shape = !this._shape; this._draft_box = null; this._pts = []; this._drawSpots(); }
+      else if (act === "spundo") { this._pts = (this._pts || []).slice(0, -1); this._drawSpots(); }
       else if (act === "spfind") this._spotDo("find");
       else if (act === "spsave") this._spotDo("save");
       else if (act === "mode") { this._hass.callService("switch", "toggle", { entity_id: id }); }
+      else if (act === "show") {
+        const st = this._st("party_mode");
+        const stop = st && st.state === "on" && st.attributes.style === id;
+        this._hass.callService("sentient", "party", stop ? { on: false } : { style: id }).catch((e) => window.alert(e.message || e));
+      }
       else if (act === "weekly") {
         this._hass.callWS({ type: "sentient/weekly" }).then(() => { this._tlKind = "learned"; this._drawTimeline(); }, (e) => window.alert(e.message || e));
       }
@@ -887,6 +1028,27 @@
         this._digBusy = true; this._drawTimeline();
         this._hass.callWS({ type: "sentient/digest", hours: 24 }).catch((e) => window.alert(e.message || e))
           .finally(() => { this._digBusy = false; this._drawTimeline(); });
+      }
+      else if (act === "itadd") { this._openItemForm(this._group, {}); }
+      else if (act === "itedit") { const it = ((this._it || {})[this._group] || { items: [] }).items.find((x) => x.id === id); if (it) this._openItemForm(this._group, it); }
+      else if (act === "itcancel") { this._itEdit = null; this._form = null; this._drawItems(this._group); }
+      else if (act === "itsave") {
+        const kind = this._group, msg = this._$("itmsg");
+        this._hass.callWS({ type: "sentient/items/save", kind, item: this._itDraft })
+          .then((r) => { this._it[kind] = r; this._itEdit = null; this._form = null; this._drawSide(); this._drawItems(kind); },
+            (e) => { if (msg) msg.textContent = e.message || String(e); });
+      } else if (act === "itdel") {
+        if (!window.confirm(`Delete ${text}?`)) return;
+        const kind = this._group;
+        this._hass.callWS({ type: "sentient/items/delete", kind, item_id: id }).then((r) => { this._it[kind] = r; this._drawSide(); this._drawItems(kind); });
+      } else if (act === "ittest") {
+        const kind = this._group, st = this._$("status");
+        if (st) st.textContent = "TRYING…";
+        this._hass.callWS({ type: "sentient/items/test", kind, item_id: id }).then((r) => {
+          this._it[kind] = r; this._drawItems(kind);
+          const res = r.result || {}, s2 = this._$("status");
+          if (s2) s2.textContent = res.match !== undefined ? (res.match ? "YES — " : "NO — ") + (res.seen || "") : res.spoken === false ? `HELD BACK: ${(res.reason || "").toUpperCase()}` : "DONE";
+        }, (e) => { const s2 = this._$("status"); if (s2) s2.textContent = e.message || String(e); });
       }
       else if (act === "scadd") { this._scDraft = { name: "", aliases: "", say: "", check_open: false, check_lights: false, check_locks: false, actions: [] }; this._openShortcutForm({}); }
       else if (act === "scedit") { const r = (this._sc || []).find((x) => x.id === id); if (r) { this._scDraft = { ...r }; this._openShortcutForm(r); } }
@@ -962,7 +1124,7 @@
         } catch (e) { window.alert(e.message || String(e)); }
         return;
       }
-      if (form.dataset.form === "spot") { this._spotDo(this._drawing && this._draft_box ? "save" : "find"); return; }
+      if (form.dataset.form === "spot") { this._spotDo(this._drawing && (this._draft_box || (this._pts || []).length >= 3) ? "save" : "find"); return; }
       if (form.dataset.form === "look") {
         const q = form.elements.q.value.trim() || form.elements.q.placeholder, spot = form.elements.spot.value;
         const out = this._$("spans"); out.textContent = "LOOKING…";
@@ -1027,9 +1189,13 @@
   }
 
   const CSS = `
-:host{display:block;min-height:100vh;color:#dff6fa;font-family:var(--ha-font-family-body, Roboto, sans-serif);
+:host{display:block;min-height:100vh;width:100%;max-width:100vw;overflow-x:hidden;color:#dff6fa;color-scheme:dark;-webkit-tap-highlight-color:transparent;font-family:var(--ha-font-family-body, Roboto, sans-serif);
   background:radial-gradient(ellipse at 20% 0%, rgba(0,255,255,0.07), transparent 50%), radial-gradient(ellipse at 90% 100%, rgba(0,140,255,0.06), transparent 50%), #070b16}
-*{box-sizing:border-box}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+input,textarea,select{-webkit-appearance:none;appearance:none}
+input:focus,textarea:focus{background-color:transparent}
+input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px #0c1424 inset;-webkit-text-fill-color:#e6f5fa}
+img,video{max-width:100%}
 [hidden]{display:none !important}
 button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer}
 .top{display:flex;align-items:center;gap:10px;height:56px;padding:0 16px;border-bottom:1px solid rgba(0,255,255,.12);background:rgba(7,11,22,.85);position:sticky;top:0;z-index:2}
@@ -1094,6 +1260,14 @@ select{background:#0d1626;border:1px solid rgba(0,255,247,.3);border-radius:8px;
 .set{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start}
 .side{position:sticky;top:74px;padding:12px;display:flex;flex-direction:column;gap:4px}
 .sh{font-size:11px;font-weight:700;letter-spacing:.32em;color:#00fff7;padding:4px 10px 10px;text-shadow:0 0 6px rgba(0,255,247,.5)}
+.menu{border-radius:14px;border:1px solid rgba(0,255,247,.08);background:rgba(0,255,247,.015)}
+.menu.here{border-color:rgba(0,255,247,.22)}
+.mh{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border-radius:14px;text-align:left;font-size:11.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#bfefff}
+.mh ha-icon{--mdc-icon-size:19px;color:#5fd8e6;flex:none} .mh span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mh u{text-decoration:none;font-size:10px;letter-spacing:0;font-weight:600;color:rgba(150,220,235,.7);border:1px solid rgba(0,255,247,.2);border-radius:9px;padding:1px 7px}
+.mh .chev{--mdc-icon-size:18px;transition:transform .2s} .menu.open .chev{transform:rotate(180deg)}
+.mh:hover{background:rgba(0,255,247,.05)} .menu.here .mh>ha-icon:first-child{color:#00fff7}
+.mi{display:none;flex-direction:column;gap:2px;padding:0 6px 8px 14px} .menu.open .mi{display:flex}
 .nav{display:flex;align-items:center;gap:12px;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid transparent}
 .nav ha-icon{--mdc-icon-size:20px;color:#5fd8e6;flex:none}
 .nav span{display:flex;flex-direction:column;min-width:0} .nav b{font-weight:500;font-size:13.5px;color:#e6f5fa}
@@ -1145,6 +1319,15 @@ select{background:#0d1626;border:1px solid rgba(0,255,247,.3);border-radius:8px;
   --ha-color-border-neutral-quiet:rgba(0,255,247,.22);--ha-color-border-neutral-normal:rgba(0,255,247,.35);
   --ha-color-text-primary:#e6f5fa;--ha-color-text-secondary:rgba(150,220,235,.75);--ha-color-form-background:rgba(0,255,247,.04);
   --ha-color-surface-default:#0c1424;--ha-color-on-neutral-quiet:#e6f5fa;--ha-color-on-neutral-normal:#e6f5fa;color-scheme:dark;
+  --ha-color-form-background-hover:rgba(0,255,247,.08);--ha-color-form-background-disabled:rgba(0,255,247,.02);
+  --ha-color-fill-neutral-quiet-active:rgba(0,255,247,.12);--ha-color-fill-neutral-normal-hover:rgba(0,255,247,.14);--ha-color-fill-neutral-normal-active:rgba(0,255,247,.18);
+  --ha-color-fill-primary-quiet-hover:rgba(0,255,247,.14);--ha-color-fill-primary-quiet-active:rgba(0,255,247,.18);
+  --mdc-ripple-color:#00fff7;--mdc-ripple-hover-opacity:.06;--mdc-ripple-focus-opacity:.1;--mdc-ripple-press-opacity:.12;
+  --mdc-text-field-hover-line-color:#00fff7;--mdc-text-field-disabled-fill-color:rgba(0,255,247,.02);--mdc-select-hover-line-color:#00fff7;
+  --input-hover-line-color:#00fff7;--input-disabled-fill-color:rgba(0,255,247,.02);--input-fill-color-hover:rgba(0,255,247,.08);
+  --wa-form-control-background-color-hover:rgba(0,255,247,.08);--wa-color-neutral-fill-quiet-hover:rgba(0,255,247,.1);
+  --primary-background-color:#0c1424;--secondary-background-color:#0c1424;--code-editor-background-color:#0c1424;--mdc-theme-background:#0c1424;
+  --ha-dialog-surface-background:#0c1424;--mdc-dialog-content-ink-color:#e6f5fa;--list-item-hover-background-color:rgba(0,255,247,.08);
   color:#e6f5fa}
 .formwrap ha-form{display:block;max-width:880px}
 .spotgrid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:20px;align-items:start}
@@ -1154,13 +1337,19 @@ select{background:#0d1626;border:1px solid rgba(0,255,247,.3);border-radius:8px;
 .snap.drawing{cursor:crosshair;border-color:#00fff7;box-shadow:0 0 16px rgba(0,255,247,.35)}
 .box{position:absolute;border:2px solid #00fff7;border-radius:6px;box-shadow:0 0 10px rgba(0,255,247,.6), inset 0 0 18px rgba(0,255,247,.15);pointer-events:none}
 .box span{position:absolute;left:-2px;top:-22px;font-size:10px;font-weight:700;letter-spacing:.12em;padding:2px 7px;border-radius:6px;background:#00fff7;color:#041016;white-space:nowrap;text-transform:uppercase}
+.shape{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.shape polygon{fill:rgba(0,255,247,.12);stroke:#00fff7;stroke-width:.5;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 4px rgba(0,255,247,.7))}
+.shape.new polygon{fill:rgba(255,190,85,.12);stroke:#ffbe55;stroke-dasharray:4 3}
+.dotp{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#ffbe55;box-shadow:0 0 6px #ffbe55;pointer-events:none}
+.box.lbl span{top:-22px}
+.r input.alias{flex:1;min-width:80px;font-size:11.5px;background:rgba(0,0,0,.2);border:1px solid rgba(0,255,247,.18);border-radius:8px;padding:4px 8px;outline:none}
 .box.new{border-style:dashed;border-color:#ffbe55;box-shadow:0 0 10px rgba(255,190,85,.5)} .box.new span{background:#ffbe55}
 .spmsg{min-height:16px;font-size:12px;color:#7fefff;margin:4px 2px} .spmsg.ans{font-size:13.5px;line-height:1.45;color:#e6f5fa}
 @media (max-width: 1100px){ .spotgrid{grid-template-columns:1fr} }
 .pill{font-size:8.5px;font-weight:700;letter-spacing:.12em;padding:3px 8px;border-radius:9px;color:rgba(150,220,235,.5);border:1px solid rgba(150,220,235,.2)}
 .pill.on{color:#00fff7;border-color:rgba(0,255,247,.5)} .pill.warn{color:#ffbe55;border-color:rgba(255,190,85,.5)}
 .night{flex-wrap:wrap} .night span{font-size:12px;color:rgba(150,220,235,.8)} .night input[type=time]{flex:none;width:auto;background:rgba(0,0,0,.25);border:1px solid rgba(0,255,247,.3);border-radius:8px;padding:4px 8px;color-scheme:dark}
-.mllist{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;margin-top:6px}
+.mllist{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(360px,100%),1fr));gap:12px;margin-top:6px}
 .ml{padding:12px 14px} .ml .r{margin:0;background:none;border:none;padding:0 0 6px} .ml.off{opacity:.55}
 .r ha-icon.lit,.ml ha-icon.lit{color:#ffd76a;filter:drop-shadow(0 0 6px rgba(255,215,106,.7))}
 .mlsub{display:flex;align-items:center;gap:6px;font-size:11.5px;color:rgba(150,220,235,.75);margin:2px 0 8px} .mlsub ha-icon{--mdc-icon-size:14px;color:#5fd8e6}
@@ -1179,7 +1368,7 @@ select{background:#0d1626;border:1px solid rgba(0,255,247,.3);border-radius:8px;
 .tli .tm{font-size:11px;font-weight:700;color:rgba(150,220,235,.7);text-align:right}
 .tli .dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,255,247,.35);background:rgba(0,255,247,.06)}
 .tli .dot ha-icon{--mdc-icon-size:15px;color:#00fff7}
-.tli .tx{min-width:0} .tli .tx b{display:block;font-weight:400;font-size:13px;color:#e6f5fa} .tli .tx i{display:block;font-style:normal;font-size:11px;color:rgba(150,220,235,.6);margin-top:1px}
+.tli .tx{min-width:0} .tli .tx b{display:block;font-weight:400;font-size:13px;line-height:1.4;color:#e6f5fa;overflow-wrap:anywhere} .tli .tx i{display:block;font-style:normal;font-size:11px;line-height:1.35;color:rgba(150,220,235,.6);margin-top:2px;overflow-wrap:anywhere}
 .tli s{text-decoration:none;font-size:8.5px;font-weight:700;letter-spacing:.12em;padding:2px 7px;border-radius:8px;color:#7fefff;border:1px solid rgba(0,255,247,.3)}
 .tli.k-held,.tli.k-noticed{opacity:.65} .tli.k-health .dot{border-color:rgba(255,190,85,.5)} .tli.k-health .dot ha-icon{color:#ffbe55}
 .tli.k-visitor .dot{border-color:rgba(61,255,168,.5)} .tli.k-visitor .dot ha-icon{color:#3dffa8} .tli.k-light .dot ha-icon{color:#ffd76a} .tli.k-critical .dot{border-color:#ff5a78;background:rgba(255,80,110,.15)} .tli.k-critical .dot ha-icon{color:#ff5a78}
@@ -1197,8 +1386,10 @@ select{background:#0d1626;border:1px solid rgba(0,255,247,.3);border-radius:8px;
 .tli.k-energy .dot ha-icon{color:#ffbe55} .tli.k-security .dot ha-icon{color:#ff7088}
 @media (max-width: 1100px){ .cols{grid-template-columns:1fr 1fr} .rm{display:none} .set{grid-template-columns:230px minmax(0,1fr)} .nav i{display:none} }
 @media (max-width: 900px){ .ask{display:none} }
-@media (max-width: 720px){ .page{padding:12px} .modes{justify-content:center} .tli{grid-template-columns:40px 28px minmax(0,1fr)} .tli s{display:none} .add .when{width:84px}  .cols{grid-template-columns:1fr} .head{flex-direction:column;text-align:center} .head img{width:120px;height:120px} .ti{font-size:22px} .st{justify-content:center}
-  .set{grid-template-columns:1fr} .side{position:static;flex-direction:row;overflow-x:auto} .sh{display:none} .nav span{display:none} .tabs span{display:none} }
+@media (max-width: 720px){ .page{padding:10px} .top{padding:0 8px;gap:6px} .top .ttl{letter-spacing:.2em;font-size:12px;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1} .tabs{margin-left:0} .tabs button{padding:6px 9px} .brief span{display:none} .brief{padding:6px 8px}
+  .tli{align-items:start} .tli .tm{padding-top:6px} .card{padding:12px} .body{padding:14px 12px} .en{grid-template-columns:90px minmax(0,1fr) 46px} .reply{margin:8px 10px 0} .reply .q{display:none}
+  .r{flex-wrap:wrap} .r b{white-space:normal} .formwrap ha-form{max-width:100%} .spotgrid{gap:12px} .digest{flex-wrap:wrap} .filters{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px} .filters button{flex:none} .modes{justify-content:center} .tli{grid-template-columns:40px 28px minmax(0,1fr)} .tli s{display:none} .add .when{width:84px}  .cols{grid-template-columns:1fr} .head{flex-direction:column;text-align:center} .head img{width:120px;height:120px} .ti{font-size:22px} .st{justify-content:center}
+  .set{grid-template-columns:1fr} .side{position:static;padding:8px 0} .sh{display:none} .nav i{display:none} .nav{padding:8px 10px} .tabs span{display:none} }
 `;
 
   // ---------- Hungarian (hu fork) ----------
@@ -1207,6 +1398,21 @@ select{background:#0d1626;border:1px solid rgba(0,255,247,.3);border-radius:8px;
   // variants are derived); labels with numbers or names in them from HU_RULES; "A · B" labels are translated
   // part by part. Anything else — memories, names, what was said — is left exactly as it is.
   const HU_WORDS = {
+    // upstream 0.35–0.40: settings groups, camera spots and checks, light shows
+    "Alarms, appointments, routines": "Ébresztők, időpontok, rutinok", "Also called, e.g. driveway, parking space": "Más néven, pl. behajtó, parkoló",
+    "Brain & system": "Agy és rendszer", "Camera checks": "Kameraellenőrzések", "Camera spots": "Kamerahelyek",
+    "Cameras & video": "Kamerák és videó", "Delivery van outside?": "Kint áll a futár?", "Doorbell, gate…": "Csengő, kapu…",
+    "Download or restore everything": "Mindent letölt vagy visszaállít", "Drag on the picture to mark it first.": "Előbb jelöld ki a képen húzással.",
+    "Goodnight, good morning…": "Jó éjszakát, jó reggelt…", "Home & routines": "Otthon és rutinok", "Lights that follow movement": "Mozgásra kapcsoló lámpák",
+    "Motion lights": "Mozgásérzékelős lámpák", "None yet": "Még nincs", "Name, e.g. the drive": "Név, pl. a behajtó",
+    "Named areas the AI zooms into": "Elnevezett részek, ahová az AI ráközelít", "On or off": "Be vagy ki", "Questions it asks — a brew?": "Kérdések, amiket feltesz – egy kávé?",
+    "Save": "Mentés", "Save spot": "Hely mentése", "Security & safety": "Biztonság", "Tap at least three corners first.": "Előbb koppints legalább három sarokra.",
+    "Things it won't mention": "Amikről nem beszél", "Undo point": "Pont visszavonása", "Voice & sound": "Hang és beszéd",
+    "THE FORM COULDN'T LOAD · REFRESH THE PAGE": "AZ ŰRLAP NEM TÖLTÖTT BE · FRISSÍTSD AZ OLDALT", "Try": "Próba", "Loading…": "Betöltés…",
+    "Cancel": "Mégse", "New spot": "Új hely", "the drive": "a behajtó", "the rabbit pen": "a nyúlketrec",
+    "Light show": "Fényshow", "Disco": "Diszkó", "Party": "Buli", "Rainbow": "Szivárvány", "Chill": "Chill", "Halloween": "Halloween", "Christmas": "Karácsony",
+    "Buttons on the overview": "Gombok az áttekintőn", "Nothing said yet": "Még nem mondott semmit", "Nothing yet today": "Ma még semmi", "Up next": "Következik",
+    "Feed": "Hírfolyam", "All": "Mind", "Open": "Megnyitás",
     // top bar and overview
     "OVERVIEW": "ÁTTEKINTÉS", "TIMELINE": "IDŐVONAL", "SETTINGS": "BEÁLLÍTÁSOK", "Ask anything…": "Kérdezz bármit…",
     "BRIEFING": "ÖSSZEFOGLALÓ", "PREPARING": "KÉSZÜL", "SENTIENT IS STARTING — OR ISN'T SET UP YET": "A SENTIENT INDUL – VAGY MÉG NINCS BEÁLLÍTVA",

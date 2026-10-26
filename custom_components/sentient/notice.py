@@ -22,12 +22,13 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.const import EVENT_STATE_CHANGED, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
 from .ai import ai_task_entity, async_generate
 from .const import (
+    personality_line,
     CONF_CHATTINESS,
     CONF_HOUSE_RULES,
     CONF_NOTICE_ENTITIES,
@@ -51,6 +52,10 @@ BATCH_SECONDS = 20
 NUMERIC_GAP = timedelta(minutes=15)
 OTHER_GAP = timedelta(seconds=30)
 _IGNORED = {STATE_UNAVAILABLE, STATE_UNKNOWN, None}
+_RESTING = {"off", "standby", "idle", "docked", "paused", "stopped", "done", "ready", "complete", "finished"}
+_GOING = {"on", "heating", "boiling", "running", "cleaning", "brewing", "playing", "washing", "drying", "cooking"}
+STARTED_BY_SOMEONE = timedelta(minutes=2)
+_CONTROLS = {"switch", "button", "input_button", "select", "input_boolean", "light", "fan", "media_player", "water_heater"}
 
 
 @dataclass
@@ -163,6 +168,8 @@ class Noticer:
             b = _number(new.state) or 0.0
             if abs(b - a) < max(0.5, abs(a) * 0.05):
                 return  # jitter
+        if old.state.lower() in _RESTING and new.state.lower() in _GOING and self._just_started(new.entity_id, now):
+            return  # someone just switched it on (by hand, an offer, a routine): they know already
         self._last_seen[new.entity_id] = now
         area_id = area_of(self.hass, new.entity_id)
         area = ar.async_get(self.hass).async_get_area(area_id) if area_id else None
@@ -179,6 +186,20 @@ class Noticer:
         )
         if self._flush_unsub is None:
             self._flush_unsub = async_call_later(self.hass, BATCH_SECONDS, self._flush)
+
+    def _just_started(self, entity_id: str, now: datetime) -> bool:
+        """Was a control on the same device (a kettle's switch, say) pressed a moment ago?"""
+        ents = er.async_get(self.hass)
+        entry = ents.async_get(entity_id)
+        if entry is None or not entry.device_id:
+            return False
+        for other in er.async_entries_for_device(ents, entry.device_id):
+            if other.entity_id == entity_id or other.domain not in _CONTROLS:
+                continue
+            st = self.hass.states.get(other.entity_id)
+            if st is not None and st.state not in _IGNORED and now - st.last_changed <= STARTED_BY_SOMEONE:
+                return True
+        return False
 
     @callback
     def _flush(self, _now: datetime) -> None:
@@ -247,6 +268,7 @@ class Noticer:
         persona = self.options.get(CONF_PERSONA) or DEFAULT_PERSONA
         lines = [
             f"You are {persona}, the brain of a family home, deciding whether to speak up.",
+            personality_line(self.options),
             f"Local time: {dt_util.now():%A %d %B, %H:%M}.",
         ]
         if rules := (self.options.get(CONF_HOUSE_RULES) or "").strip():
@@ -294,7 +316,12 @@ class Noticer:
             "Be exact about what the new state means: 'heating', 'running', 'on', 'cleaning' or 'boiling' "
             "mean it has just STARTED — never say something has finished, is done or is ready unless its new "
             "state says so (e.g. it went from heating/running to standby/off/idle/done). Don't copy earlier "
-            "remarks. "
+            "remarks. Talk only about what just changed: never bring up other topics or chores (bins, "
+            "shopping, cleaning, appointments) — briefings cover those. "
+            "Only offer to do something the house can actually do by switching a device: lights, plugs, fans, "
+            "the air purifier, heating, media. Never offer to open or close doors or windows, make or prepare "
+            "drinks or food, or anything else that needs hands — just say what happened. Don't offer to do "
+            "something with a device that's offline. "
             "If you speak, write one short, natural sentence, no IDs or entity names "
             "in code form, no forms of address. Set question to true only if you're offering to do "
             "something and need a yes or no (e.g. 'It's got chilly, shall I put the heating on?')."

@@ -159,7 +159,23 @@
           "warm_by_weekends": "Meleg legyen ekkorra (hétvégén)",
           "voice_stt_base": "A hangfelismerés mögötti beszédfelismerő",
           "voice_id_url": "A Voice ID app címe",
-          "embed_url": "A szemantikus memória címe"
+          "embed_url": "A szemantikus memória címe",
+          "heating_limit": "Fűtés visszaállítása ennyi idő után",
+          "personality": "Személyiség",
+          "personality_notes": "Személyiség megjegyzések",
+          "camera_security": "Kamerás biztonság",
+          "camera_security_sensors": "A kamerák személyérzékelői",
+          "camera_security_inside": "A kerítésen belül",
+          "camera_security_entries": "Bejáratok",
+          "camera_security_describe": "Írja le, ki az",
+          "party_lights": "Fényshow lámpái",
+          "party_style": "Stílus",
+          "party_minutes": "Magától leáll ennyi idő után",
+          "party_whole_house": "A ház összes lámpája",
+          "party_exclude": "Ezeket a lámpákat soha",
+          "party_sound": "A hangot kövesse innen",
+          "party_show": "Gombok az áttekintőn",
+          "party_sound_switch": "Bekapcsolás hallgatás közben"
         },
         "data_description": {
           "motion_window": "Hány perc mozgáselőzményt vegyen figyelembe, amikor eldönti, hol vannak az emberek.",
@@ -214,7 +230,23 @@
           "warm_by_weekends": "Opcionális: ugyanez szombatra és vasárnapra.",
           "voice_stt_base": "A Sentient hang-STT-je ennek adja tovább a hangot a szövegért (pl. Home Assistant Cloud). Üresen az első másikat használja.",
           "voice_id_url": "Ahol a Sentient Voice ID app figyel, pl. http://xxxxxxxx-sentient-voice-id:8765. Üresen a hangfelismerés ki van kapcsolva.",
-          "embed_url": "Ahol a Sentient app szövegmodellje figyel (ugyanaz az app, mint a Voice ID). Üresen a Voice ID címét használja; ha az sincs, csak kulcsszó alapján keres."
+          "embed_url": "Ahol a Sentient app szövegmodellje figyel (ugyanaz az app, mint a Voice ID). Üresen a Voice ID címét használja; ha az sincs, csak kulcsszó alapján keres.",
+          "heating_limit": "Ha valaki hanggal vagy az appban feljebb veszi vagy bekapcsolja a fűtést, ennyi óra után visszaállítja (az ütemezésre, vagy ki). 0 = soha.",
+          "personality": "Milyen stílusban beszéljen a ház – megjegyzésekben, összefoglalókban, üdvözlésekben és minden hangasszisztensnél.",
+          "personality_notes": "Nem kötelező, a saját szavaiddal, pl. 'Imádja a macskákat. Finoman ugrat, mennyi kávé fogy.'",
+          "camera_security": "Kövesse az embereket kameráról kamerára, és riasszon, ha valaki az udvaron van, pedig a kapu és az ajtók nem nyíltak, vagy ha éjjel mozog valaki, amikor senki sincs ébren. Csendes órákban is hangosan szól, ha az éjszakai őrség is.",
+          "camera_security_sensors": "Minden kamera (vagy zóna) személyérzékelője, pl. a kapukamera 'Person' érzékelője.",
+          "camera_security_inside": "A kapun vagy kerítésen belüli helyek személyérzékelői – udvar, tároló. Ha ott valaki úgy jelenik meg, hogy egy bejárat sem nyílt, az riasztás.",
+          "camera_security_entries": "A kapu és az ajtók, amelyeken át be kell jönni (pl. a kapu és a bejárati ajtó).",
+          "camera_security_describe": "Minden riasztásnál egy AI-pillantás a kamerára ('sötét kapucnis férfi a tároló ajtajánál').",
+          "party_lights": "A lámpák, amelyek beszállnak, ha nem az egész ház megy. Üresen annak a szobának a lámpái, ahonnan kérik (vagy mondj szobát: 'diszkó a nappaliban').",
+          "party_style": "Diszkó: gyors színváltások. Buli: élénk színek, rövid átmenetek. Szivárvány: színkör. Chill: lassú, halvány színek. Halloween: villódzó narancs, lila és zöld. Karácsony: piros, zöld és meleg fehér, csillogva.",
+          "party_minutes": "Utána minden lámpa pontosan úgy áll vissza, ahogy volt. 0 = amíg ki nem kapcsolják.",
+          "party_whole_house": "Minden szabályozható vagy színes lámpa beszáll (lámpacsoportok, képernyők és háttérvilágítások nem). Mondd: 'diszkó mindenhol', ha csak most az egyszer kell.",
+          "party_exclude": "Minden showból kimarad, a 'mindenhol'-ból is – tabletek kijelzője, projektor, hálószoba, ahol alszik valaki.",
+          "party_sound": "Nem kötelező: egy hangerő-érzékelő dB-ben, pl. egy hangszóró mikrofonja az ESPHome sound_level érzékelőjén át. A diszkó, buli, szivárvány és Halloween ekkor követi a zenét – hangosabb = fényesebb, minden ütemre színt vált.",
+          "party_show": "Mely showk kapjanak gombot az áttekintőn. Üresen egyik sem; hanggal mindegyik működik.",
+          "party_sound_switch": "Nem kötelező: kapcsoló, amitől a hangerő-érzékelő mér (hogy ne küldjön adatot egész nap). Bekapcsol, amíg a show követi a hangot, utána ki. Magától megtalálja, ha ugyanazon az eszközön van és a nevében 'loudness' szerepel."
         }
       },
       "memories": {
@@ -301,6 +333,9 @@
       },
       "announce_visitors": {
         "name": "Látogatók bemondása"
+      },
+      "party_mode": {
+        "name": "Fényshow"
       }
     },
     "stt": {
@@ -362,6 +397,25 @@
         "digest": "A napi kivonat",
         "critical": "Biztonsági riasztások (füst, CO, gáz, szivárgás)",
         "security": "Nyitva maradt dolgok, amikor mindenki elmegy"
+      }
+    },
+    "personality": {
+      "options": {
+        "calm": "Nyugodt és lényegre törő",
+        "dry": "Száraz humor",
+        "warm": "Kedves és barátságos",
+        "cheeky": "Pimasz",
+        "composed": "Higgadt, mint egy komornyik"
+      }
+    },
+    "party_style": {
+      "options": {
+        "disco": "Diszkó",
+        "party": "Buli",
+        "rainbow": "Szivárvány",
+        "chill": "Chill",
+        "halloween": "Halloween",
+        "christmas": "Karácsony"
       }
     }
   },
@@ -633,6 +687,32 @@
         "forget": {
           "name": "Elfelejtés",
           "description": "Inkább felejtse el ennek a személynek az arcát."
+        }
+      }
+    },
+    "party": {
+      "name": "Fényshow",
+      "description": "Fényshow indítása vagy leállítása (diszkó, Halloween, karácsony…). Leálláskor a lámpák pontosan úgy állnak vissza, ahogy voltak.",
+      "fields": {
+        "on": {
+          "name": "Be",
+          "description": "Ki: leállítja, és visszaállítja a lámpákat."
+        },
+        "style": {
+          "name": "Stílus",
+          "description": "Diszkó, buli, szivárvány, chill, Halloween vagy karácsony. Üresen a beállítás szerint."
+        },
+        "minutes": {
+          "name": "Perc",
+          "description": "Magától leáll ennyi idő után (0 = amíg ki nem kapcsolják). Üresen a beállítás szerint."
+        },
+        "area": {
+          "name": "Szoba",
+          "description": "Ennek a szobának a lámpái (vagy 'mindenhol' az összes lámpa)."
+        },
+        "lights": {
+          "name": "Lámpák",
+          "description": "Pontosan ezek a lámpák."
         }
       }
     }

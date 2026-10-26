@@ -22,6 +22,7 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.json import JsonObjectType
 
 from .const import (
+    personality_line,
     CONF_HOUSE_RULES,
     CONF_PERSONA,
     CONF_PROMPT_MEMORIES,
@@ -524,8 +525,9 @@ class LookTool(_Tool):
     description = (
         "Look through a camera right now and answer a question about what it sees, e.g. "
         "'what's going on in the garden?', 'is there a parcel at the front door?', 'are the "
-        "bins out?'. 'camera' can be the camera's name or its area. Answer the person in "
-        "your own words from the result."
+        "bins out?', 'is the car on the drive?'. 'camera' can be the camera's name or its area. If the "
+        "question is about a named spot (the drive, the rabbit pen…), pass it as 'spot' — the right camera "
+        "is used automatically. Answer the person in your own words from the result."
     )
     parameters = vol.Schema(
         {vol.Required("camera"): cv.string, vol.Required("question"): cv.string, vol.Optional("spot"): cv.string}
@@ -636,7 +638,9 @@ class NightWatchTool(_Tool):
         self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
     ) -> JsonObjectType:
         rt = _runtime(hass)
-        return rt.night_watch.describe() if rt is not None else {"error": "Sentient is not loaded"}
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        return {**rt.night_watch.describe(), "camera_security": rt.camsec.describe()}
 
 
 class WeeklyTool(_Tool):
@@ -658,6 +662,115 @@ class WeeklyTool(_Tool):
         from .weekly import build
 
         return build(rt)
+
+
+class AcceptOfferTool(_Tool):
+    name = "sentient_accept_offer"
+    description = (
+        "The answer to one of the house's offers ('fancy a brew?', 'shall I put the heating on?'): "
+        "accept=true does it, accept=false is a no (and it'll ask less). 'offer' is its id or name; "
+        "'note' is any detail they gave."
+    )
+    parameters = vol.Schema({vol.Required("offer"): cv.string, vol.Optional("accept", default=True): cv.boolean,
+                             vol.Optional("note"): cv.string})
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        a = tool_input.tool_args
+        return await rt.offers.async_accept(a["offer"], a.get("accept", True), a.get("note"))
+
+
+class AlarmTool(_Tool):
+    name = "sentient_alarm"
+    description = (
+        "Alarms and appointments. action 'set': name, time (HH:MM, 24-hour), and either days "
+        "(list of mon..sun, or 'weekdays'/'weekends'/'every day') for a repeating alarm, or date "
+        "(YYYY-MM-DD) for a one-off on another day (neither = next time it comes round); optional "
+        "description and routine (the name of one of the household's named routines to run when it "
+        "goes off). action 'list' shows them and when each next goes off. action 'cancel' with name "
+        "deletes one; 'off'/'on' with name pauses or resumes it."
+    )
+    parameters = vol.Schema({
+        vol.Required("action"): vol.In(["set", "list", "cancel", "off", "on"]),
+        vol.Optional("name"): cv.string, vol.Optional("time"): cv.string,
+        vol.Optional("days"): vol.Any(cv.string, [cv.string]), vol.Optional("date"): cv.string,
+        vol.Optional("description"): cv.string, vol.Optional("routine"): cv.string,
+    })
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        a = tool_input.tool_args
+        action = a["action"]
+        if action == "list":
+            return {"alarms": rt.alarms.listing()}
+        if not a.get("name"):
+            return {"error": "Which alarm?"}
+        if action in ("cancel", "off", "on"):
+            item = rt.lists["alarms"].find(a["name"])
+            if item is None:
+                return {"error": f"No alarm called {a['name']}", "alarms": [x["name"] for x in rt.alarms.listing()]}
+            if action == "cancel":
+                rt.lists["alarms"].remove(item["id"])
+                return {"cancelled": item["name"]}
+            rt.lists["alarms"].update(item["id"], enabled=action == "on")
+            return {"alarm": item["name"], "on": action == "on"}
+        if not a.get("time"):
+            return {"error": "What time?"}
+        from .kinds import DAYS
+
+        days = a.get("days") or []
+        if isinstance(days, str):
+            low = days.lower()
+            days = (DAYS if "every" in low or "daily" in low else DAYS[:5] if "weekday" in low
+                    else DAYS[5:] if "weekend" in low else [d for d in DAYS if d in low])
+        if a.get("routine") and rt.shortcuts.find(a["routine"]) is None:
+            return {"error": f"There's no routine called {a['routine']}", "routines": [r.name for r in rt.shortcuts.items.values()]}
+        item = rt.alarms.set(a["name"], a["time"], days, a.get("date"), a.get("description") or "", a.get("routine"))
+        nxt = next((x for x in rt.alarms.listing() if x["id"] == item["id"]), {})
+        return {"set": item["name"], "time": str(item["time"])[:5], "days": item["days"], "next": nxt.get("next")}
+
+
+class PartyTool(_Tool):
+    name = "sentient_party"
+    description = (
+        "Light shows: lights put on a colour show, then go back exactly as they were. Use for 'disco "
+        "mode', 'party lights', 'light show', 'chill lights', 'Halloween lights', 'Christmas lights' and "
+        "'stop the disco'. action 'start' (optional style: disco, party, rainbow, chill, halloween or "
+        "christmas; minutes; area = a room's lights, or 'everywhere' for every light in the house), 'stop', "
+        "or 'status'. Starting again while it's on changes the style or room. If it says it's following the "
+        "sound, the lights react to the music in the room."
+    )
+    parameters = vol.Schema({
+        vol.Required("action"): vol.In(["start", "stop", "status"]),
+        vol.Optional("style"): cv.string, vol.Optional("minutes"): vol.Coerce(float), vol.Optional("area"): cv.string,
+    })
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        a = tool_input.tool_args
+        if a["action"] == "status":
+            return rt.party.describe()
+        if a["action"] == "stop":
+            return await rt.party.async_end()
+        style = (a.get("style") or "").strip().lower() or None
+        lights = rt.party.lights_for(a.get("area"), llm_context.device_id) if a.get("area") else None
+        if a.get("area") and not lights:
+            return {"error": f"No lights found in {a['area']}"}
+        if lights is None and not rt.party.lights_for() and llm_context.device_id:
+            lights = rt.party.lights_for(None, llm_context.device_id)
+        return await rt.party.async_party(style, a.get("minutes"), lights)
 
 
 class BriefingTool(_Tool):
@@ -975,7 +1088,7 @@ class SentientAPI(llm.API):
             llm_context=llm_context,
             tools=[RememberTool(), RecallTool(), ForgetTool(), AnnounceTool(),
                    WatchTool(), RemindTool(), ListWatchesTool(), CancelWatchTool(), LookTool(),
-                   RoutinesTool(), AdoptRoutineTool(), ForgetRoutineTool(), HeatingTool(), NightWatchTool(), WeeklyTool(), BriefingTool(), VisitorsTool(), SpotTool(), MotionLightsTool(), TimelineTool(), QuietTool(), ShushTool(), RunRoutineTool(), EnergyTool(), SecurityTool(), ScenesTool(), CalendarEventTool()]
+                   RoutinesTool(), AdoptRoutineTool(), ForgetRoutineTool(), AcceptOfferTool(), AlarmTool(), PartyTool(), HeatingTool(), NightWatchTool(), WeeklyTool(), BriefingTool(), VisitorsTool(), SpotTool(), MotionLightsTool(), TimelineTool(), QuietTool(), ShushTool(), RunRoutineTool(), EnergyTool(), SecurityTool(), ScenesTool(), CalendarEventTool()]
                   + ([LearnVoiceTool(), VoicesTool(), ForgetVoiceTool(), LearnFaceTool(), FacesTool(), ForgetFaceTool()]
                      if self._voice_on() else []),
         )
@@ -1023,6 +1136,7 @@ class SentientAPI(llm.API):
         lines = [
             f"You are {persona}, the brain of this home. The same memory is shared by "
             "every voice and automation in the house.",
+            personality_line(opts),
             f"Local time: {dt_util.now().strftime('%A %d %B %Y, %H:%M')}.",
         ]
         if rules := (opts.get(CONF_HOUSE_RULES) or "").strip():
@@ -1045,6 +1159,21 @@ class SentientAPI(llm.API):
             lines.append("Things you know about this household:")
             lines.extend(f"- {m.text}" for m in memories)
             lines.append("Use sentient_recall for anything not listed here.")
+        if spots := rt.spots.describe():
+            lines.append(
+                "Named camera spots — for questions about these, call sentient_look with the spot; it picks "
+                "the camera that can see it: " + "; ".join(spots[:15]) + "."
+            )
+        offline = [i["name"] for i in rt.health.issues if i.get("kind") == "offline"]
+        if offline:
+            lines.append(
+                "Offline right now (commands to these won't work — say so instead of claiming it's done): "
+                + ", ".join(offline[:12]) + "."
+            )
+        lines.append(
+            "After controlling a device, only say it's done if the tool result says it worked; if a device is "
+            "unavailable or the action failed, say so plainly."
+        )
         routines = sorted(rt.learner.all(), key=lambda r: (r.adopted, r.support), reverse=True)[:10]
         if routines:
             lines.append("Household routines and habits learned from history:")

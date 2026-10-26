@@ -24,6 +24,7 @@ from homeassistant.util import dt as dt_util
 
 from .ai import ai_task_entity, async_generate
 from .const import (
+    personality_line,
     CONF_BRIEFING_CALENDARS,
     CONF_BRIEFING_SECTIONS,
     CONF_BRIEFING_SYSTEM,
@@ -257,7 +258,9 @@ class Upkeep:
 
         report = build(self._rt())
         text = summary(report)
-        self._rt().timeline.add("learned", text, "this week")
+        recent = self._rt().timeline.since(0.17, ["learned"], 1)
+        if not recent:  # pressing the button again straight away doesn't add it twice
+            self._rt().timeline.add("learned", text, "this week")
         return {"summary": text, **report}
 
     async def _async_digest_quietly(self) -> None:
@@ -282,7 +285,7 @@ class Upkeep:
                 "Summarise this home's log in three or four short, friendly sentences for the family: "
                 "visitors, anything that went wrong or needs doing, notable things said. Skip routine "
                 "chatter and repeated items. Plain sentences, no lists, no entity IDs. "
-                "Never say or imply the house is or was empty.\n\n" + "\n".join(lines),
+                "Never say or imply the house is or was empty. " + personality_line(rt.options) + "\n\n" + "\n".join(lines),
                 None,
             )
             text = str(result or "").strip() or t("digest.nothing")
@@ -351,7 +354,7 @@ class Upkeep:
             "Sentient: briefing",
             f"You are {persona}, the brain of a family home. Write a spoken briefing of two to four short, "
             "natural sentences from these facts. Lead with what needs doing; skip "
-            "anything empty; no lists, no IDs, no forms of address."
+            "anything empty; no lists, no IDs, no forms of address. " + personality_line(rt.options)
             + (f"\nHouse rules:\n{rules}" if rules else "")
             + f"\nFacts: {facts}",
             None,

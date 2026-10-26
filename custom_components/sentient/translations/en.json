@@ -157,6 +157,22 @@
           "night_watch_speakers": "Say alerts on",
           "warm_by_weekdays": "Warm by (weekdays)",
           "warm_by_weekends": "Warm by (weekends)",
+          "heating_limit": "Turn heating back after",
+          "personality": "Personality",
+          "personality_notes": "Personality notes",
+          "camera_security": "Camera security",
+          "camera_security_sensors": "Cameras' person sensors",
+          "camera_security_inside": "Inside the boundary",
+          "camera_security_entries": "Ways in",
+          "camera_security_describe": "Describe who it is",
+          "party_lights": "Show lights",
+          "party_style": "Style",
+          "party_minutes": "Stop by itself after",
+          "party_whole_house": "Use every light in the house",
+          "party_exclude": "Never use these lights",
+          "party_sound": "Follow the sound from",
+          "party_show": "Buttons on the overview",
+          "party_sound_switch": "Turn on while listening",
           "voice_stt_base": "Speech-to-text behind voice recognition",
           "voice_id_url": "Voice ID app address",
           "embed_url": "Semantic memory address"
@@ -212,6 +228,22 @@
           "night_watch_speakers": "Leave empty for every speaker.",
           "warm_by_weekdays": "Optional: when it should be warm on weekdays. Leave empty to use the learned getting-up time.",
           "warm_by_weekends": "Optional: the same for Saturdays and Sundays.",
+          "heating_limit": "When someone turns the heating up or on by voice or in the app, put it back (to its schedule, or off) after this many hours. 0 never does.",
+          "personality": "How the house sounds — in remarks, briefings, welcomes and to every voice assistant.",
+          "personality_notes": "Optional, in your own words, e.g. 'Fond of the cats. Teases gently about how much tea gets made.'",
+          "camera_security": "Follow people from camera to camera, and alert for someone in the garden when the gate and doors didn't open, or anyone about at night with nobody up. Alerts are said out loud in quiet hours if night watch does.",
+          "camera_security_sensors": "Each camera's (or zone's) person sensor, e.g. Frigate's 'Gate person occupancy'.",
+          "camera_security_inside": "The person sensors for places behind the gate or fence — the garden, the shed. Someone appearing there without a way in opening is an alert.",
+          "camera_security_entries": "The gate and doors people should come through (e.g. the back gate and the back door).",
+          "camera_security_describe": "One AI look at the camera for each alert ('a man in a dark hoodie trying the shed door').",
+          "party_lights": "The lights that join in when not using the whole house. Leave empty to use the room of whoever asks (or say a room: 'disco mode in the living room').",
+          "party_style": "Disco: quick colour changes. Party: bright colours, short fades. Rainbow: a colour wheel. Chill: slow, dim colours. Halloween: flickering orange, purple and green. Christmas: red, green and warm white, twinkling.",
+          "party_minutes": "Then every light goes back exactly as it was. 0 keeps going until it's turned off.",
+          "party_whole_house": "Every light that can dim or change colour joins in (light groups, screens and backlights don't). Say 'disco mode everywhere' to do this just once.",
+          "party_exclude": "Left out of every show, even 'everywhere' — tablet screens, a projector, a bedroom where someone sleeps.",
+          "party_sound": "Optional: a loudness sensor in dB, such as a voice speaker's microphone through ESPHome's sound_level sensor. Disco, party, rainbow and Halloween then follow the music — louder is brighter, and each beat changes colour.",
+          "party_show": "Which shows get a button on the overview. Leave empty for none; every show still works by voice.",
+          "party_sound_switch": "Optional: a switch that makes the loudness sensor report (so it isn't sending readings all day). It's turned on while a show follows the sound and off afterwards. Found automatically if it's on the same device and has 'loudness' in its name.",
           "voice_stt_base": "Sentient's voice STT passes the audio on to this one for the words (e.g. Home Assistant Cloud). Leave empty to use the first other one.",
           "voice_id_url": "Where the Sentient Voice ID app listens, e.g. http://xxxxxxxx-sentient-voice-id:8765. Empty turns voice recognition off.",
           "embed_url": "Where the Sentient app's text model listens (the same app as Voice ID). Empty uses the Voice ID address; with neither, memories are found by keywords only."
@@ -296,6 +328,9 @@
       "chime": {
         "name": "Chime"
       },
+      "party_mode": {
+        "name": "Light show"
+      },
       "notify_target": {
         "name": "Notifications: {name}"
       },
@@ -362,6 +397,25 @@
         "digest": "The daily digest",
         "critical": "Safety alerts (smoke, CO, gas, leaks)",
         "security": "Things left open when everyone goes out"
+      }
+    },
+    "personality": {
+      "options": {
+        "calm": "Calm and to the point",
+        "dry": "Dry wit",
+        "warm": "Warm and friendly",
+        "cheeky": "Cheeky",
+        "composed": "Composed, like a butler"
+      }
+    },
+    "party_style": {
+      "options": {
+        "disco": "Disco",
+        "party": "Party",
+        "rainbow": "Rainbow",
+        "chill": "Chill",
+        "halloween": "Halloween",
+        "christmas": "Christmas"
       }
     }
   },
@@ -613,6 +667,32 @@
     "weekly_report": {
       "name": "Weekly report",
       "description": "Put together what the house learned and noticed in the last week, and keep it on the timeline."
+    },
+    "party": {
+      "name": "Light show",
+      "description": "Start or stop a light show (disco, Halloween, Christmas…). Lights go back exactly as they were when it stops.",
+      "fields": {
+        "on": {
+          "name": "On",
+          "description": "Off stops it and puts the lights back."
+        },
+        "style": {
+          "name": "Style",
+          "description": "Disco, party, rainbow, chill, Halloween or Christmas. Empty uses the setting."
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "Stop by itself after this long (0 = until turned off). Empty uses the setting."
+        },
+        "area": {
+          "name": "Room",
+          "description": "Use this room's lights (or 'everywhere' for every light)."
+        },
+        "lights": {
+          "name": "Lights",
+          "description": "Use exactly these lights."
+        }
+      }
     },
     "learn_face": {
       "name": "Learn a face",

@@ -251,3 +251,18 @@ async def test_non_admin_can_read_but_not_change_or_spend(
     assert (await ws.receive_json())["error"]["code"] == "unauthorized"
     await ws.send_json({"id": 5, "type": "sentient/digest"})
     assert (await ws.receive_json())["error"]["code"] == "unauthorized"
+
+
+def test_upstream_040_sentences_in_hungarian() -> None:
+    from custom_components.sentient import i18n
+
+    i18n.set_language("hu")
+    try:
+        assert i18n.t("camsec.fence", place="Udvar") == "Valaki van itt: Udvar, pedig a kapu és az ajtók nem nyíltak ki"
+        assert i18n.t("alert.heads_up", text="valaki a tárolónál") == "Figyelem: valaki a tárolónál."
+        assert i18n.t("follow.failed", what="Spájz lámpa", verb=i18n.t("follow.on"), why="") == (
+            "Sajnos a spájz lámpa nem reagált, így nem sikerült bekapcsolni."
+        )
+        assert i18n.t("offer.default", name="Bekapcsolni a fűtést") == "Megcsináljam: bekapcsolni a fűtést?"
+    finally:
+        i18n.set_language("en")

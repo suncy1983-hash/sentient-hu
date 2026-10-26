@@ -11,7 +11,7 @@ Sentient is built in stages. Each stage is used in a real house before the next 
 - [x] Backup-only speakers, used only when no main speaker's room is occupied (0.5.0)
 - [x] Activity-scored rooms: decaying motion history, voice-interaction boost, pass-through areas, every-occupied-room mode, seeded from the recorder (0.2.0)
 - [x] Memory and last-spoken sensors
-- [ ] Dashboard card (core, feed and stats) shipped with the integration
+- [x] Dashboard card (core, feed and stats) shipped with the integration (0.40.0: custom:sentient-hub-card, custom:sentient-shows-card)
 - [x] Memory manager in the options flow (view, edit, delete) (0.3.0)
 
 ## Stage 2 — Watches *(in progress)*
@@ -67,3 +67,9 @@ Sentient is built in stages. Each stage is used in a real house before the next 
 - [x] Parcels left without a ring: one look after a doorstep visit ends, said only when something new appears (0.31.0)
 - [x] Heating that learns: warm-up rate, usual temperature, getting-up times; optional warm-up before people are up, back on the thermostat's schedule afterwards (0.34.0)
 - [x] Night watch: doors and gates opening at times they never normally do with nobody up inside — alert, optionally out loud through quiet hours (0.34.0)
+- [x] Fixes from a week of real use: night watch only in quiet hours and knows the house is up (door then gate is one trip), motion lights ignore lights reporting back, house health ignores entities that never have a reading, phone layout, says so when a voice request didn't happen, heating turned up goes back after a set time, no offers it can't carry out (0.35.0)
+- [x] Personality setting used everywhere; offers (brew, heating…) with their own page; announcements (doorbell, gate) through quiet hours with a 'someone going out' skip; alarms with routines, room follow-ups, calendar ('bins tonight: recycling') and voice control; standing camera checks (is there a delivery van?); camera security — routes across cameras, over the fence, anyone about at night; spots with other names and drawn shapes that pick the right camera (0.36.0)
+- [x] Settings grouped into menus that fold away: voice & sound, cameras & video, security & safety, home & routines, brain & system (0.37.0)
+- [x] Disco mode: disco, party, rainbow and chill light shows for chosen lights or a named room; lights go back exactly as they were (even after a restart); switch, voice and an action (0.38.0)
+- [x] Light shows: whole house ('everywhere'), lights to leave out, Halloween and Christmas styles, following the music from a loudness sensor, and a choice of which shows get an overview button (0.39.0)
+- [x] Quieter: no remarks about something a person just switched on; voice follow-through only after real speech; shorter camera journeys; hub and light-show dashboard cards (0.40.0)

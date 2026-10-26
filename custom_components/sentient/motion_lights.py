@@ -13,7 +13,7 @@ house switched on, the house stops managing it until it's next off.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 import logging
 from typing import Any
 import uuid
@@ -34,6 +34,7 @@ _LOGGER = logging.getLogger(__name__)
 STORAGE_VERSION = 1
 DEFAULT_NIGHT_START = "23:00"
 DEFAULT_NIGHT_END = "06:00"
+SETTLE = timedelta(seconds=30)  # a light reporting back after our command is not a person
 EVENT_MOTION_LIGHTS = f"{DOMAIN}_motion_lights"
 EVENT_MOTION_LIGHT = f"{DOMAIN}_motion_light"
 
@@ -82,8 +83,10 @@ class MotionLights:
         self.night_start = DEFAULT_NIGHT_START
         self.night_end = DEFAULT_NIGHT_END
         self._ours: dict[str, set[str]] = {}  # light -> context ids of our own changes
+        self._sent: dict[str, datetime] = {}  # light -> when we last switched it
         self._timers: dict[str, CALLBACK_TYPE] = {}
         self._unsub: CALLBACK_TYPE | None = None
+        self.paused: set[str] = set()  # lights something else is running for now (disco mode)
 
     # ----- storage ---------------------------------------------------------------
     async def async_load(self) -> None:
@@ -162,6 +165,17 @@ class MotionLights:
         if not enabled:
             self._release(rule.light)
         self._save()
+
+    @callback
+    def pause(self, lights: list[str]) -> None:
+        """Leave these lights alone (and forget we were running them) until resumed."""
+        for light in lights:
+            self._release(light)
+        self.paused.update(lights)
+
+    @callback
+    def resume(self, lights: list[str]) -> None:
+        self.paused.difference_update(lights)
 
     def describe(self) -> list[dict[str, Any]]:
         out = []
@@ -259,10 +273,21 @@ class MotionLights:
         if new is None or new.state != STATE_ON:
             self._release(rule.light)
             return
-        if event.context.id not in self._ours[rule.light]:
-            # someone changed it by hand: theirs now, so don't switch it off on them
-            self._release(rule.light)
-            self._note(rule, t("motion.taken_over"))
+        if event.context.id in self._ours[rule.light]:
+            return
+        old = event.data["old_state"]
+        if old is None or old.state in ("unavailable", "unknown"):
+            return  # the light reconnecting, not a person
+        sent = self._sent.get(rule.light)
+        if sent is not None and dt_util.utcnow() - sent < SETTLE:
+            return  # the light reporting back after our own command (brightness, colour, a refresh)
+        if old.state == STATE_ON:
+            a, b = old.attributes.get("brightness"), new.attributes.get("brightness")
+            if a is None or b is None or abs(int(a) - int(b)) < 26:
+                return  # only colour, effect or a tiny brightness wobble changed: not a person
+        # someone changed it: theirs now, so don't switch it off on them
+        self._release(rule.light)
+        self._note(rule, t("motion.taken_over"))
 
     @callback
     def _release(self, light: str) -> None:
@@ -276,6 +301,8 @@ class MotionLights:
 
     @callback
     def _on_motion(self, rule: MotionRule) -> None:
+        if rule.light in self.paused:
+            return
         self._cancel_timer(rule.light)
         light = self.hass.states.get(rule.light)
         if light is None:
@@ -297,14 +324,14 @@ class MotionLights:
 
     @callback
     def _on_still(self, rule: MotionRule) -> None:
-        if rule.light not in self._ours:
+        if rule.light not in self._ours or rule.light in self.paused:
             return
         self._cancel_timer(rule.light)
 
         @callback
         def _off(_now: datetime) -> None:
             self._timers.pop(rule.light, None)
-            if rule.light in self._ours and not self._motion_now(rule):
+            if rule.light in self._ours and rule.light not in self.paused and not self._motion_now(rule):
                 self._turn(rule, False)
                 self._note(rule, t("motion.off"))
 
@@ -314,6 +341,7 @@ class MotionLights:
     def _turn(self, rule: MotionRule, on: bool, brightness: int | None = None) -> None:
         context = Context()
         self._ours.setdefault(rule.light, set()).add(context.id)
+        self._sent[rule.light] = dt_util.utcnow()
         domain = rule.light.split(".", 1)[0]
         service_domain = domain if domain in ("light", "switch", "input_boolean", "fan") else "homeassistant"
         data: dict[str, Any] = {"entity_id": rule.light}

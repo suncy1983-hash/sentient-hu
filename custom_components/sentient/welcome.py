@@ -19,7 +19,7 @@ from homeassistant.util import dt as dt_util
 
 from .ai import ai_task_entity, async_generate
 from . import i18n
-from .const import CONF_WELCOME, CONF_WELCOME_PEOPLE
+from .const import personality_line, CONF_WELCOME, CONF_WELCOME_PEOPLE
 from .i18n import t
 
 _LOGGER = logging.getLogger(__name__)
@@ -95,7 +95,8 @@ class Welcome:
                     "Someone has just come home. In at most two short spoken sentences, starting with "
                     f"'{t('welcome.plain')}', tell them what's worth knowing from this log of while they were out "
                     "(visitors, parcels, things that finished, problems). No names, no times unless useful. "
-                    "Never say or imply the house was empty." + i18n.write_in() + "\n\n" + "\n".join(lines)
+                    "Never say or imply the house was empty. " + personality_line(self.options)
+                    + i18n.write_in() + "\n\n" + "\n".join(lines)
                 ),
             }
             if ai := ai_task_entity(self.hass, self.options):

@@ -235,3 +235,37 @@ learn_face:
       default: false
       selector:
         boolean:
+party:
+  fields:
+    "on":
+      example: true
+      selector:
+        boolean:
+    style:
+      example: disco
+      selector:
+        select:
+          options:
+            - disco
+            - party
+            - rainbow
+            - chill
+            - halloween
+            - christmas
+          translation_key: party_style
+    minutes:
+      example: 60
+      selector:
+        number:
+          min: 0
+          max: 600
+          unit_of_measurement: min
+    area:
+      example: living room
+      selector:
+        area:
+    lights:
+      selector:
+        entity:
+          domain: light
+          multiple: true
