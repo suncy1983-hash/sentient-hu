@@ -220,7 +220,38 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         version = (await async_get_integration(hass, DOMAIN)).version
         for card in ("sentient-shows-card", "sentient-hub-card"):
             add_extra_js_url(hass, f"{FRONTEND_URL}/{card}.js?v={version}")
+        # also as dashboard resources: the companion apps don't always pick up extra JS, so a card
+        # could show "Custom element doesn't exist". Kept on the current version so updates reach clients.
+        try:
+            await _async_card_resources(hass, str(version))
+        except Exception as err:  # noqa: BLE001 - cards are a nicety; never block setup
+            _LOGGER.debug("Sentient couldn't register its dashboard cards as resources: %s", err)
     return True
+
+
+async def _async_card_resources(hass: HomeAssistant, version: str) -> None:
+    """Register (or move to this version) the Sentient cards as Lovelace resources, storage mode only."""
+    from homeassistant.components.lovelace.const import LOVELACE_DATA
+
+    data = hass.data.get(LOVELACE_DATA)
+    res = getattr(data, "resources", None)
+    if res is None or not hasattr(res, "async_create_item"):
+        return  # YAML-mode resources: the user manages them
+    if not res.loaded:
+        await res.async_load()
+        res.loaded = True
+    items = list(res.async_items() or [])
+    for card in ("sentient-shows-card", "sentient-hub-card"):
+        base = f"{FRONTEND_URL}/{card}.js"
+        url = f"{base}?v={version}"
+        same = [i for i in items if str(i.get("url", "")).split("?", 1)[0] == base]
+        if not same:
+            await res.async_create_item({"res_type": "module", "url": url})
+            continue
+        if same[0].get("url") != url:
+            await res.async_update_item(same[0]["id"], {"res_type": "module", "url": url})
+        for extra in same[1:]:
+            await res.async_delete_item(extra["id"])
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> bool:
