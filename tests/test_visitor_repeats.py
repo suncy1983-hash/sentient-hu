@@ -135,3 +135,17 @@ async def test_a_visible_person_is_never_nobody(hass: HomeAssistant) -> None:
     await _walk_past(hass, entry)
     assert entry.runtime_data.visitors.log[0]["kind"] == "unknown"
     assert len(said) == 1
+
+
+async def test_announce_visitors_switch_silences_the_speakers_only(hass: HomeAssistant) -> None:
+    entry, _ai = await _setup(hass, [{"kind": "visitor", "description": "A stranger", "clothes": "red coat", "same_as": 0}])
+    said = async_mock_service(hass, "assist_satellite", "announce")
+    sent = async_mock_service(hass, "notify", "send_message")
+    switch = next(s.entity_id for s in hass.states.async_all("switch") if s.entity_id.endswith("announce_visitors"))
+    assert hass.states.get(switch).state == "on"
+    await hass.services.async_call("switch", "turn_off", {"entity_id": switch}, blocking=True)
+    await hass.async_block_till_done()
+    assert hass.states.get(switch).state == "off"
+    await _walk_past(hass, entry)
+    assert not said  # the speakers stay quiet
+    assert len(sent) == 1  # Kata, who is out, still gets it on her phone

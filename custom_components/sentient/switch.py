@@ -14,7 +14,14 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
 from . import SentientConfigEntry
-from .const import CONF_CHIME, CONF_NOTIFY_TARGETS, DOMAIN, EVENT_MODE_CHANGED
+from .const import (
+    CONF_ANNOUNCE_VISITORS,
+    CONF_CHIME,
+    CONF_NOTIFY_TARGETS,
+    DEFAULT_ANNOUNCE_VISITORS,
+    DOMAIN,
+    EVENT_MODE_CHANGED,
+)
 
 DEFAULT_HUSH_MINUTES = 60
 
@@ -23,7 +30,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: SentientConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     phones = [NotifyTargetSwitch(hass, entry, target) for target in entry.runtime_data.options.get(CONF_NOTIFY_TARGETS) or []]
-    async_add_entities([HushSwitch(entry), GuestSwitch(entry), ChimeSwitch(entry), *phones])
+    async_add_entities([HushSwitch(entry), GuestSwitch(entry), ChimeSwitch(entry), AnnounceVisitorsSwitch(entry), *phones])
 
 
 class NotifyTargetSwitch(SwitchEntity, RestoreEntity):
@@ -173,6 +180,34 @@ class ChimeSwitch(_ModeSwitch):
         entry.runtime_data.speech.options = {**entry.runtime_data.speech.options, CONF_CHIME: on}
         self.async_write_ha_state()
         self.hass.bus.async_fire(EVENT_MODE_CHANGED, {"chime": on})
+
+
+class AnnounceVisitorsSwitch(_ModeSwitch):
+    """Whether the speakers say who has come to the door or gate (the visitor log and phones carry on)."""
+
+    _attr_icon = "mdi:account-voice"
+
+    def __init__(self, entry: SentientConfigEntry) -> None:
+        super().__init__(entry, "announce_visitors")
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self._entry.runtime_data.visitors.options.get(CONF_ANNOUNCE_VISITORS, DEFAULT_ANNOUNCE_VISITORS))
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self._set(False)
+
+    def _set(self, on: bool) -> None:
+        entry = self._entry
+        self.hass.config_entries.async_update_entry(
+            entry, options={**entry.data, **entry.options, CONF_ANNOUNCE_VISITORS: on}
+        )
+        visitors = entry.runtime_data.visitors
+        visitors.options = {**visitors.options, CONF_ANNOUNCE_VISITORS: on}
+        self.async_write_ha_state()
 
 
 _HUSH_TIMERS: dict[str, Any] = {}

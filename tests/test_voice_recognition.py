@@ -44,6 +44,7 @@ class FakeBase:
         self.text, self.heard = text, 0
 
     async def internal_async_process_audio_stream(self, metadata, stream):
+        self.language = metadata.language
         async for chunk in stream:
             self.heard += len(chunk)
         return SpeechResult(self.text, SpeechResultState.SUCCESS)
@@ -109,7 +110,7 @@ async def test_words_pass_through_and_the_speaker_is_known(hass: HomeAssistant) 
     with patch("custom_components.sentient.voice.VoiceID._call", app.call), \
          patch("custom_components.sentient.stt.async_get_speech_to_text_engine", return_value=base):
         entity_id, stt = _stt(hass, entry)
-        assert stt.supported_languages == ["hu-HU", "en-US"]
+        assert stt.supported_languages == ["hu-HU", "en-US", "hu", "en"]
         result = await _say(stt)
         await hass.async_block_till_done()
 
@@ -181,3 +182,22 @@ async def test_off_without_an_address(hass: HomeAssistant) -> None:
         api = await _prompt(hass)
         assert "voice" not in {t.name.split("_")[-1] for t in api.tools}
         assert "from the voice" not in api.api_prompt
+
+
+async def test_a_short_language_code_reaches_the_base_in_its_own_spelling(hass: HomeAssistant) -> None:
+    """A pipeline set to "hu" (as a Whisper wants) still works when the base is a cloud that knows "hu-HU"."""
+    import dataclasses
+
+    entry = await _setup(hass)
+    app, base = FakeApp(), FakeBase("jó reggelt")
+    with patch("custom_components.sentient.voice.VoiceID._call", app.call), \
+         patch("custom_components.sentient.stt.async_get_speech_to_text_engine", return_value=base):
+        _entity_id, stt = _stt(hass, entry)
+        short = dataclasses.replace(META, language="hu")
+        assert stt.check_metadata(short)
+
+        async def audio():
+            yield SECOND
+
+        result = await stt.async_process_audio_stream(short, audio())
+    assert result.text == "jó reggelt" and base.language == "hu-HU"

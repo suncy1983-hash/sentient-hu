@@ -10,6 +10,7 @@ conversation agent runs.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 from collections.abc import AsyncIterable
 import logging
 from typing import Any
@@ -75,7 +76,25 @@ class SentientVoiceSTT(SpeechToTextEntity):
 
     @property
     def supported_languages(self) -> list[str]:
-        return self._from_base("supported_languages", [self.hass.config.language])
+        """The base's languages, plus each one's short and regional form, so switching the base between,
+        say, a Whisper ("hu") and a cloud ("hu-HU") never leaves the pipeline's language unsupported."""
+        langs = self._from_base("supported_languages", [self.hass.config.language])
+        out = list(dict.fromkeys(langs))
+        for lang in langs:
+            short = lang.split("-")[0].split("_")[0]
+            if short not in out:
+                out.append(short)
+        return out
+
+    def _base_language(self, wanted: str) -> str:
+        """The base's own spelling of a language: exactly it, else the same language in any region."""
+        langs = self._from_base("supported_languages", [])
+        if not langs or wanted in langs:
+            return wanted
+        short = wanted.replace("_", "-").split("-")[0].lower()
+        same = [lang for lang in langs if lang.replace("_", "-").split("-")[0].lower() == short]
+        regional = [lang for lang in same if lang.lower().startswith(f"{short}-{short}")]
+        return (regional or same or [wanted])[0]
 
     @property
     def supported_formats(self) -> list[AudioFormats]:
@@ -130,6 +149,8 @@ class SentientVoiceSTT(SpeechToTextEntity):
             if usable:  # the speech has ended: start on the voice while the words are worked out
                 identify.append(self.hass.async_create_task(voice.async_identify(bytes(audio))))
 
+        if (language := self._base_language(metadata.language)) != metadata.language:
+            metadata = dataclasses.replace(metadata, language=language)
         try:
             if hasattr(base, "internal_async_process_audio_stream"):
                 result = await base.internal_async_process_audio_stream(metadata, tee())

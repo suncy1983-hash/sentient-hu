@@ -298,6 +298,9 @@
       },
       "notify_target": {
         "name": "Notifications: {name}"
+      },
+      "announce_visitors": {
+        "name": "Announce visitors"
       }
     },
     "stt": {
