@@ -60,6 +60,28 @@ from .const import (
     CONF_SPEAK_VOLUME,
     CONF_NIGHT_VOLUME,
     CONF_DUCK_MEDIA,
+    CONF_ROOM_VOLUME,
+    CONF_FULL_VOLUME_SPEAKERS,
+    CONF_TTS_ENTITY,
+    CONF_MEDIA_SPEAKERS,
+    CONF_MEDIA_IMPORTANT_ONLY,
+    CONF_SLEEP,
+    CONF_SLEEP_MINUTES,
+    CONF_BEDTIME_ROUTINES,
+    CONF_SLEEP_ACTIONS,
+    CONF_WAKE_ACTIONS,
+    CONF_FORESIGHT,
+    CONF_FORESIGHT_TIME,
+    CONF_FOLLOW_YOU,
+    CONF_FOLLOW_MINUTES,
+    CONF_DRIVE_CAMERA,
+    CONF_DRIVE_SPOT,
+    CONF_DRIVE_TRIGGERS,
+    CONF_CONVERSATIONS,
+    CONF_FOLLOW_UPS,
+    CONF_CURIOSITY,
+    CONF_REFLECTION,
+    CONF_REFLECTION_TIME,
     CONF_CRITICAL,
     CONF_ENERGY,
     CONF_LEFT_OPEN_MINUTES,
@@ -83,8 +105,23 @@ from .const import (
     CONF_BRIEFINGS,
     CONF_CAMERA_COOLDOWN,
     CONF_CHAT_AGENT,
+    CONF_VOICE_AGENT,
+    CONF_BACKUP_AGENT,
+    CONF_ANIMAL_SENSORS,
+    CONF_AWAY_LIGHTS_ON,
+    CONF_AWAY_PEOPLE,
+    CONF_AWAY_LIGHTS,
+    CONF_AWAY_AFTER,
+    CONF_SCREEN,
+    CONF_SCREEN_ACTIONS,
+    CONF_SCREEN_CLEAR_ACTIONS,
+    CONF_ANIMAL_LOW,
+    CONF_ANIMAL_HIGH,
     CONF_CHATTINESS,
     CONF_DAILY_AI_LIMIT,
+    CONF_APPLIANCES,
+    CONF_APPLIANCE_ANNOUNCE,
+    CONF_APPLIANCE_WATTS,
     CONF_DEFAULT_SPEAKER,
     CONF_DOOR_CAMERA,
     CONF_DOOR_TRIGGERS,
@@ -117,7 +154,7 @@ from .const import (
 GROUPS: list[tuple[str, str, str, str, list[str]]] = [
     ("voice", "Voice", "mdi:account-voice", "Name, speakers and how it talks.", [
         CONF_PERSONA, CONF_SPEAKERS, CONF_DEFAULT_SPEAKER, CONF_FALLBACK_SPEAKERS, CONF_CHIME, CONF_SPEAK_VOLUME,
-        CONF_NIGHT_VOLUME, CONF_DUCK_MEDIA, CONF_ALL_OCCUPIED,
+        CONF_NIGHT_VOLUME, CONF_DUCK_MEDIA, CONF_ROOM_VOLUME, CONF_FULL_VOLUME_SPEAKERS, CONF_MEDIA_SPEAKERS, CONF_MEDIA_IMPORTANT_ONLY, CONF_TTS_ENTITY, CONF_FOLLOW_YOU, CONF_FOLLOW_MINUTES, CONF_ALL_OCCUPIED,
         CONF_PERSONALITY, CONF_PERSONALITY_NOTES, CONF_CHATTINESS, CONF_BANNED_WORDS, CONF_HOUSE_RULES,
     ]),
     ("voices", "Voice recognition", "mdi:account-voice", "Who is speaking: the Voice ID app and the speech-to-text it sits on.", [
@@ -126,8 +163,9 @@ GROUPS: list[tuple[str, str, str, str, list[str]]] = [
     ("memory", "Memory", "mdi:brain", "Finding memories by meaning, not just by matching words.", [
         CONF_EMBED_URL,
     ]),
-    ("quiet", "Quiet & rooms", "mdi:weather-night", "When to keep it down and how rooms are worked out.", [
-        CONF_QUIET_START, CONF_QUIET_END, CONF_MOTION_WINDOW, CONF_PASS_THROUGH_AREAS,
+    ("quiet", "Quiet & rooms", "mdi:weather-night", "When to keep it down, knowing when the house has gone to bed and woken up, and how rooms are worked out.", [
+        CONF_QUIET_START, CONF_QUIET_END, CONF_SLEEP, CONF_SLEEP_MINUTES, CONF_BEDTIME_ROUTINES, CONF_SLEEP_ACTIONS,
+        CONF_WAKE_ACTIONS, CONF_MOTION_WINDOW, CONF_PASS_THROUGH_AREAS,
         CONF_SUPPRESS_ENTITIES, CONF_SUPPRESS_SECONDS,
     ]),
     ("briefing", "Briefings", "mdi:text-box-outline", "What a briefing covers and when.", [
@@ -149,7 +187,7 @@ GROUPS: list[tuple[str, str, str, str, list[str]]] = [
     ]),
     ("door", "Doorbell & AI looks", "mdi:doorbell-video", "Doorbell log, parcels, faces, and which AI looks at pictures.", [
         CONF_DOOR_CAMERA, CONF_DOOR_TRIGGERS, CONF_FACE_SENSOR, CONF_ANNOUNCE_VISITORS, CONF_PARCEL_ALERTS, CONF_DOORSTEP_SENSORS,
-        CONF_AI_TASK_ENTITY, CONF_SECOND_OPINION, CONF_CAMERA_COOLDOWN, CONF_DAILY_AI_LIMIT,
+        CONF_AI_TASK_ENTITY, CONF_SECOND_OPINION, CONF_CAMERA_COOLDOWN,
     ]),
     ("phone", "Phone notifications", "mdi:cellphone-message", "What also goes to people's phones.", [
         CONF_NOTIFY_TARGETS, CONF_NOTIFY_WHEN,
@@ -160,6 +198,28 @@ GROUPS: list[tuple[str, str, str, str, list[str]]] = [
     ("party", "Light shows", "mdi:party-popper", "Disco, Halloween, Christmas and more: lights put on a show, can follow the music, then go back exactly as they were.", [
         CONF_PARTY_WHOLE_HOUSE, CONF_PARTY_LIGHTS, CONF_PARTY_EXCLUDE, CONF_PARTY_STYLE, CONF_PARTY_MINUTES,
         CONF_PARTY_SOUND, CONF_PARTY_SOUND_SWITCH, CONF_PARTY_SHOW,
+    ]),
+    ("mind", "Mind", "mdi:head-lightbulb-outline", "Remembering conversations, checking back on things, asking about what it can't explain, thinking over the day each night, a look at tomorrow each evening — and how many AI calls it may make a day.", [
+        CONF_CONVERSATIONS, CONF_FOLLOW_UPS, CONF_CURIOSITY, CONF_REFLECTION, CONF_REFLECTION_TIME, CONF_FORESIGHT, CONF_FORESIGHT_TIME,
+        CONF_DAILY_AI_LIMIT,
+    ]),
+    ("voicebackup", "Voice backup", "mdi:lifebuoy", "If the AI voice agent fails or times out, the same request goes to a backup agent so simple things still work. Point your Assist pipeline at the “with backup” agent to use it.", [
+        CONF_VOICE_AGENT, CONF_BACKUP_AGENT,
+    ]),
+    ("screen", "Tablet screen", "mdi:tablet-dashboard", "What the Sentient screen card shows: alerts with the camera, notices, a morning card and the house at a glance. Actions can wake a tablet and switch it to that page.", [
+        CONF_SCREEN, CONF_SCREEN_ACTIONS, CONF_SCREEN_CLEAR_ACTIONS,
+    ]),
+    ("animals", "Animals", "mdi:rabbit", "Temperatures where animals live outside — a hutch, a kennel, a coop: a word when it's too cold or too hot, and frost warnings the evening before.", [
+        CONF_ANIMAL_SENSORS, CONF_ANIMAL_LOW, CONF_ANIMAL_HIGH,
+    ]),
+    ("appliances", "Appliances", "mdi:washing-machine", "How long things normally run: says when one's finished, or seems stuck — in plain words, no AI.", [
+        CONF_APPLIANCES, CONF_APPLIANCE_ANNOUNCE, CONF_APPLIANCE_WATTS,
+    ]),
+    ("drive", "The drive", "mdi:car", "Which cars are on the drive, from a camera spot — one AI look when activity settles.", [
+        CONF_DRIVE_SPOT, CONF_DRIVE_CAMERA, CONF_DRIVE_TRIGGERS,
+    ]),
+    ("away", "Away lights", "mdi:home-export-outline", "When everyone's out after dark, the lights copy how they were used at the same time last week, a few minutes either way, so the house looks lived in. Stops the moment anyone's home. Nothing is said.", [
+        CONF_AWAY_LIGHTS_ON, CONF_AWAY_PEOPLE, CONF_AWAY_LIGHTS, CONF_AWAY_AFTER,
     ]),
     ("energy", "Energy", "mdi:lightning-bolt", "Electricity use from the Energy dashboard's devices.", [
         CONF_ENERGY, CONF_ENERGY_PRICE,
@@ -224,6 +284,10 @@ def _with_defaults(current: dict[str, Any]) -> dict[str, Any]:
 @callback
 def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_get_settings)
+    websocket_api.async_register_command(hass, ws_thumb)
+    from .wizard import async_register as _wizard
+
+    _wizard(hass)
     websocket_api.async_register_command(hass, ws_save_settings)
     websocket_api.async_register_command(hass, ws_update_memory)
     websocket_api.async_register_command(hass, ws_list_memories)
@@ -256,15 +320,8 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_motion_night)
 
 
-@websocket_api.websocket_command({vol.Required("type"): "sentient/settings", vol.Optional("language"): str})
-@websocket_api.require_admin
-@websocket_api.async_response
-async def ws_get_settings(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
-    entry = _entry(hass)
-    if entry is None:
-        connection.send_error(msg["id"], "not_loaded", "Sentient is not set up")
-        return
-    lang = msg.get("language") or hass.config.language
+async def _labels(hass: HomeAssistant, lang: str) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+    """Field labels, helper lines and dropdown texts from the translations."""
     options = await async_get_translations(hass, lang, "options", {DOMAIN})
     selectors = await async_get_translations(hass, lang, "selector", {DOMAIN})
     prefix = f"component.{DOMAIN}.options.step."
@@ -276,6 +333,20 @@ async def ws_get_settings(hass: HomeAssistant, connection, msg: dict[str, Any]) 
                 labels[key] = label
             if (helper := options.get(f"{prefix}{step}.data_description.{key}")) and key not in helpers:
                 helpers[key] = helper
+    # "chattiness.options.quiet" -> "Quiet", for the form's dropdowns
+    texts = {k.removeprefix(f"component.{DOMAIN}.selector."): v for k, v in selectors.items()}
+    return labels, helpers, texts
+
+
+@websocket_api.websocket_command({vol.Required("type"): "sentient/settings", vol.Optional("language"): str})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_get_settings(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
+    entry = _entry(hass)
+    if entry is None:
+        connection.send_error(msg["id"], "not_loaded", "Sentient is not set up")
+        return
+    labels, helpers, selector_texts = await _labels(hass, msg.get("language") or hass.config.language)
     groups = [
         {
             "id": gid, "title": title, "icon": icon, "blurb": blurb,
@@ -290,8 +361,7 @@ async def ws_get_settings(hass: HomeAssistant, connection, msg: dict[str, Any]) 
             "data": _with_defaults(_current(entry)),
             "labels": labels,
             "helpers": helpers,
-            # "chattiness.options.quiet" -> "Quiet", for the form's dropdowns
-            "selector": {k.removeprefix(f"component.{DOMAIN}.selector."): v for k, v in selectors.items()},
+            "selector": selector_texts,
             "categories": MEMORY_CATEGORIES,
         },
     )
@@ -594,6 +664,26 @@ def ws_mutes(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
     connection.send_result(msg["id"], {"mutes": mutes.listing(), "learned": feedback.listing()})
 
 
+@websocket_api.websocket_command({
+    vol.Required("type"): "sentient/feedback/thumb", vol.Required("text"): str, vol.Optional("source"): vol.Any(str, None),
+    vol.Required("up"): bool,
+})
+@callback
+def ws_thumb(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
+    """A thumbs up or down on something it said."""
+    entry = _entry(hass)
+    if entry is None:
+        connection.send_error(msg["id"], "not_loaded", "Sentient is not set up")
+        return
+    result = entry.runtime_data.feedback.thumb(msg["text"], msg.get("source"), msg["up"],
+                                               sorted(entry.runtime_data.noticer.entities))
+    entry.runtime_data.timeline.add(
+        "learned", f"{'Thumbs up' if msg['up'] else 'Thumbs down'}: {msg['text'][:120]}",
+        ("about " + ", ".join(result["about"])) if result["about"] else None,
+    )
+    connection.send_result(msg["id"], result)
+
+
 # ----- named routines -------------------------------------------------------------
 @websocket_api.websocket_command({vol.Required("type"): "sentient/shortcuts"})
 @callback
@@ -746,7 +836,7 @@ def _items_payload(hass: HomeAssistant, entry, kind: str) -> dict[str, Any]:
     }
 
 
-_KIND = vol.In(["offers", "announce", "alarms", "checks"])
+_KIND = vol.In(["offers", "announce", "alarms", "checks", "autooff"])
 
 
 @websocket_api.websocket_command({vol.Required("type"): "sentient/items", vol.Required("kind"): _KIND})
@@ -825,6 +915,10 @@ async def ws_items_test(hass: HomeAssistant, connection, msg: dict[str, Any]) ->
                 "urgent", [s for s in item.get("speakers") or [] if hass.states.get(s)] or None, source="alarm test",
             )
             result = result.as_dict()
+        elif kind == "autooff":
+            on = [e for e in rt.autooff.targets(item) if hass.states.get(e) and hass.states.get(e).state == "on"]
+            await rt.autooff.async_switch_off(item, on)
+            result = {"switched_off": on}
         else:
             result = await rt.checks.async_check(item, force=True)
     except Exception as err:  # noqa: BLE001

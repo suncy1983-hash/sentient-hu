@@ -24,7 +24,7 @@ async def async_setup_entry(
     entry: SentientConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    async_add_entities([MemorySensor(entry), LastSpokenSensor(entry), LikelyRoomSensor(entry), WatchesSensor(entry), RoutinesSensor(entry), VisitorsSensor(entry), HealthSensor(entry), SpeakerSensor(entry)])
+    async_add_entities([MemorySensor(entry), LastSpokenSensor(entry), LikelyRoomSensor(entry), WatchesSensor(entry), RoutinesSensor(entry), VisitorsSensor(entry), HealthSensor(entry), DriveSensor(entry), MindSensor(entry), HouseSensor(entry), ScreenSensor(entry), SpeakerSensor(entry)])
 
 
 class SpeakerSensor(SensorEntity):
@@ -200,7 +200,7 @@ class LikelyRoomSensor(_Base):
             "speaker": (rt.speech.pick_speaker() or [None])[0],
             "quiet_hours": rt.speech.quiet_now(),
             "persona": rt.options.get("persona") or self._entry.title,
-            "ai_checks_today": rt.watches.ai_checks_today,
+            "ai_checks_today": rt.ai.used,
             "chat_agent": rt.options.get("chat_agent"),
         }
 
@@ -233,7 +233,7 @@ class WatchesSensor(_Base):
                 {**w.summary(), "ends": w.until, "entity_id": w.entity_id, "wakes_on": w.triggers, "spot": w.spot}
                 for w in manager.watches
             ],
-            "ai_checks_today": manager.ai_checks_today,
+            "ai_checks_today": self._entry.runtime_data.ai.used,
         }
 
 
@@ -319,3 +319,135 @@ class HealthSensor(_Base):
     def extra_state_attributes(self) -> dict[str, Any]:
         health = self._entry.runtime_data.health
         return {"issues": health.issues[:30], "updates": health.updates}
+
+
+class DriveSensor(_Base):
+    """Cars on the drive, from the AI's last look at the drive spot."""
+
+    _attr_icon = "mdi:car"
+    _attr_native_unit_of_measurement = "cars"
+
+    def __init__(self, entry: SentientConfigEntry) -> None:
+        super().__init__(entry, "drive")
+
+    async def async_added_to_hass(self) -> None:
+        from .drive import EVENT_DRIVE
+
+        self.async_on_remove(self.hass.bus.async_listen(EVENT_DRIVE, self._changed))
+
+    @callback
+    def _changed(self, _event: Event) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> int | None:
+        return self._entry.runtime_data.drive.describe().get("cars")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._entry.runtime_data.drive.describe()
+        return {"description": d.get("description"), "checked": d.get("checked_at"), "changed": d.get("changed_at"),
+                "set_up": self._entry.runtime_data.drive.spot() is not None}
+
+
+class MindSensor(_Base):
+    """What it's thinking: overnight thoughts, questions, follow-ups and conversations today."""
+
+    _attr_icon = "mdi:head-lightbulb-outline"
+    _attr_native_unit_of_measurement = "conversations"
+
+    def __init__(self, entry: SentientConfigEntry) -> None:
+        super().__init__(entry, "mind")
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(async_track_time_interval(self.hass, self._tick, timedelta(minutes=1)))
+
+    @callback
+    def _tick(self, _now) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> int:
+        return self._entry.runtime_data.conversations.count_today()
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        rt = self._entry.runtime_data
+        last = rt.reflection.last or {}
+        curious = rt.curiosity.listing()
+        return {
+            "thoughts": last.get("thoughts") or [],
+            "learned_overnight": last.get("memories") or [],
+            "last_reflection": last.get("time"),
+            "wondering": curious["wondering"],
+            "asked": curious["asked"],
+            "follow_ups": rt.loops.listing(),
+            "to_pass_on": [q["text"] for q in rt.followyou.queue if q.get("source") != "thought"],
+            "recent_conversations": [rt.conversations.describe(e) for e in rt.conversations.recent(hours=12, limit=5)],
+            "ai": rt.ai.describe(),
+            "lessons": [m.text for m in rt.memory.items if m.category == "correction"][-10:],
+            "appliances": rt.appliances.listing(),
+        }
+
+
+class HouseSensor(_Base):
+    """Asleep or awake: when everyone went to bed, and when someone was up."""
+
+    _attr_icon = "mdi:home-heart"
+    _attr_device_class = "enum"
+    _attr_options = ["awake", "asleep"]
+
+    def __init__(self, entry: SentientConfigEntry) -> None:
+        super().__init__(entry, "house")
+
+    async def async_added_to_hass(self) -> None:
+        from .sleep import EVENT_SLEEP
+
+        self.async_on_remove(self.hass.bus.async_listen(EVENT_SLEEP, self._changed))
+
+    @callback
+    def _changed(self, _event: Event) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def icon(self) -> str:
+        return "mdi:sleep" if self._entry.runtime_data.sleep.asleep else "mdi:home-heart"
+
+    @property
+    def native_value(self) -> str:
+        return "asleep" if self._entry.runtime_data.sleep.asleep else "awake"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        sleep = self._entry.runtime_data.sleep
+        usual = sleep.usual()
+        return {"since": sleep.since, "usual_bedtime": usual["bedtime"], "usual_up": usual["up"]}
+
+
+class ScreenSensor(_Base):
+    """What a wall tablet's Sentient screen shows: alert, notice, morning or idle."""
+
+    _attr_icon = "mdi:tablet-dashboard"
+    _attr_device_class = "enum"
+    _attr_options = ["idle", "morning", "notice", "alert"]
+
+    def __init__(self, entry: SentientConfigEntry) -> None:
+        super().__init__(entry, "screen")
+
+    async def async_added_to_hass(self) -> None:
+        from .screen import EVENT_SCREEN
+
+        self.async_on_remove(self.hass.bus.async_listen(EVENT_SCREEN, self._changed))
+
+    @callback
+    def _changed(self, _event: Event) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> str:
+        return self._entry.runtime_data.screen.mode()
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._entry.runtime_data.screen.describe()
+        return {"cards": d["cards"], "morning": d["morning"]}

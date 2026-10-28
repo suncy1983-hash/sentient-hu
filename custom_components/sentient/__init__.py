@@ -10,10 +10,18 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import llm
 
+from .ai import AIGate
+from .animals import Animals
+from .away import Away
+from .watchdog import Watchdog
+from .guard import Guard
+from .screen import Screen
+from .appliances import Appliances
 from .const import (
     DOMAIN,
     EVENT_MODE_CHANGED,
@@ -69,6 +77,14 @@ from .alarms import Alarms
 from .checks import CameraChecks
 from .camsecurity import CameraSecurity
 from .party import Party
+from .followyou import FollowYou, Loops
+from .conversations import Conversations
+from .curiosity import Curiosity
+from .reflection import Reflection
+from .drive import Drive
+from .autooff import AutoOff
+from .foresight import Foresight
+from .sleep import Sleep
 from .watches import WatchManager
 from .speech import SpeechRouter
 from .voice import VoiceID
@@ -77,7 +93,7 @@ from .semantic import Embedder, SemanticIndex
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.STT]
+PLATFORMS: list[Platform] = [Platform.CONVERSATION, Platform.SENSOR, Platform.SWITCH, Platform.STT]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -118,6 +134,21 @@ class SentientRuntime:
     checks: CameraChecks
     camsec: CameraSecurity
     party: Party
+    followyou: FollowYou
+    loops: Loops
+    conversations: Conversations
+    curiosity: Curiosity
+    reflection: Reflection
+    drive: Drive
+    autooff: AutoOff
+    foresight: Foresight
+    sleep: Sleep
+    ai: AIGate
+    appliances: Appliances
+    animals: Animals
+    away: Away
+    watchdog: Watchdog
+    screen: Screen
 
 
 type SentientConfigEntry = ConfigEntry[SentientRuntime]
@@ -218,40 +249,72 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         from homeassistant.loader import async_get_integration
 
         version = (await async_get_integration(hass, DOMAIN)).version
-        for card in ("sentient-shows-card", "sentient-hub-card"):
-            add_extra_js_url(hass, f"{FRONTEND_URL}/{card}.js?v={version}")
-        # also as dashboard resources: the companion apps don't always pick up extra JS, so a card
-        # could show "Custom element doesn't exist". Kept on the current version so updates reach clients.
-        try:
-            await _async_card_resources(hass, str(version))
-        except Exception as err:  # noqa: BLE001 - cards are a nicety; never block setup
-            _LOGGER.debug("Sentient couldn't register its dashboard cards as resources: %s", err)
+        # each card's address only changes when that card's file does, so a browser's saved copy of
+        # the page keeps working across updates that don't touch the cards
+        tags = await hass.async_add_executor_job(_card_tags)
+        for card in CARDS:
+            add_extra_js_url(hass, f"{FRONTEND_URL}/{card}.js?v={tags.get(card, version)}")
+
+        # also as dashboard resources: an app or browser holding an old copy of the page loads those
+        # with the dashboard, so the cards are never "not found" after an update
+        async def _resources(_event=None) -> None:
+            try:
+                await async_register_card_resources(hass, version, tags)
+            except Exception as err:  # noqa: BLE001 - the extra JS above still works in most places
+                _LOGGER.debug("Couldn't add the cards as dashboard resources: %s", err)
+
+        if hass.is_running:
+            hass.async_create_task(_resources())
+        else:
+            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _resources)
     return True
 
 
-async def _async_card_resources(hass: HomeAssistant, version: str) -> None:
-    """Register (or move to this version) the Sentient cards as Lovelace resources, storage mode only."""
-    from homeassistant.components.lovelace.const import LOVELACE_DATA
+CARDS = ("sentient-shows-card", "sentient-hub-card", "sentient-screen-card")
 
+
+def _card_tags(cards: tuple[str, ...] = CARDS) -> dict[str, str]:
+    """A short fingerprint of each file, for its address."""
+    import hashlib
+    from pathlib import Path
+
+    out = {}
+    for card in cards:
+        try:
+            out[card] = hashlib.md5((Path(__file__).parent / "frontend" / f"{card}.js").read_bytes()).hexdigest()[:10]  # noqa: S324
+        except OSError:
+            pass
+    return out
+
+
+async def async_register_card_resources(hass: HomeAssistant, version: str, tags: dict[str, str] | None = None) -> list[str]:
+    """Make sure each card is a module resource on the dashboards, at this version."""
+    try:
+        from homeassistant.components.lovelace.const import LOVELACE_DATA
+    except ImportError:
+        return []
     data = hass.data.get(LOVELACE_DATA)
-    res = getattr(data, "resources", None)
-    if res is None or not hasattr(res, "async_create_item"):
-        return  # YAML-mode resources: the user manages them
-    if not res.loaded:
-        await res.async_load()
-        res.loaded = True
-    items = list(res.async_items() or [])
-    for card in ("sentient-shows-card", "sentient-hub-card"):
+    resources = getattr(data, "resources", None)
+    if resources is None or not hasattr(resources, "async_create_item"):
+        return []  # YAML-mode resources: nothing we can add
+    if not getattr(resources, "loaded", True):
+        await resources.async_load()
+        resources.loaded = True
+    done = []
+    for card in CARDS:
         base = f"{FRONTEND_URL}/{card}.js"
-        url = f"{base}?v={version}"
-        same = [i for i in items if str(i.get("url", "")).split("?", 1)[0] == base]
-        if not same:
-            await res.async_create_item({"res_type": "module", "url": url})
+        url = f"{base}?v={(tags or {}).get(card, version)}"
+        mine = [r for r in resources.async_items() if str(r.get("url", "")).split("?")[0] == base]
+        if not mine:
+            await resources.async_create_item({"res_type": "module", "url": url})
+            done.append(url)
             continue
-        if same[0].get("url") != url:
-            await res.async_update_item(same[0]["id"], {"res_type": "module", "url": url})
-        for extra in same[1:]:
-            await res.async_delete_item(extra["id"])
+        for extra in mine[1:]:
+            await resources.async_delete_item(extra["id"])
+        if mine[0].get("url") != url:
+            await resources.async_update_item(mine[0]["id"], {"res_type": "module", "url": url})
+            done.append(url)
+    return done
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> bool:
@@ -274,7 +337,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
     await tracker.async_start()
     entry.async_on_unload(tracker.async_stop)
     speech = SpeechRouter(hass, options, tracker)
+    ai = AIGate(hass, entry.entry_id, options)
+    await ai.async_start()
     watches = WatchManager(hass, entry.entry_id, options, speech)
+    watches.gate = ai
     spots = Spots(hass, entry.entry_id, options)
     await spots.async_load()
     watches.spots = spots
@@ -293,7 +359,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
     upkeep = Upkeep(hass, lambda: entry.runtime_data)
     upkeep.async_start()
     entry.async_on_unload(upkeep.async_stop)
-    health = HouseHealth(hass, options)
+    health = HouseHealth(hass, options, lambda: getattr(entry, "runtime_data", None))
     health.async_start()
     entry.async_on_unload(health.async_stop)
     visitors = Visitors(hass, entry.entry_id, options, speech, watches)
@@ -331,11 +397,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
     announcements = Announcements(hass, lists["announce"], get_rt)
     alarms = Alarms(hass, lists["alarms"], get_rt)
     checks = CameraChecks(hass, lists["checks"], get_rt)
+    autooff = AutoOff(hass, lists["autooff"], get_rt)
     camsec = CameraSecurity(hass, options, get_rt)
     party = Party(hass, entry.entry_id, options, get_rt)
     followthrough = FollowThrough(hass, speech, timeline)
     followthrough.async_start()
     entry.async_on_unload(followthrough.async_stop)
+    followyou = FollowYou(hass, entry.entry_id, options, get_rt)
+    loops = Loops(hass, entry.entry_id, options, get_rt)
+    conversations = Conversations(hass, entry.entry_id, options)
+    curiosity = Curiosity(hass, entry.entry_id, options, get_rt)
+    reflection = Reflection(hass, entry.entry_id, options, get_rt)
+    drive = Drive(hass, entry.entry_id, options, get_rt)
+    foresight = Foresight(hass, options, get_rt)
+    sleep = Sleep(hass, entry.entry_id, options, get_rt)
+    appliances = Appliances(hass, entry.entry_id, options, get_rt)
+    animals = Animals(hass, options, get_rt)
+    away = Away(hass, entry.entry_id, options, get_rt)
+    learner.extra_automated = away.times
+    watchdog = Watchdog(hass, entry.entry_id, options, get_rt)
+    screen = Screen(hass, options, get_rt)
+    conversations.timeline = timeline
+    guard = Guard(hass)
+    guard.async_start()
+    entry.async_on_unload(guard.async_stop)
+    conversations.guard = guard
+    noticer.skip = appliances.handled  # appliances (and the rest of their device) say "finished" themselves, without the AI
+    shortcuts.on_run = sleep.routine_ran
+    speech.on_unheard = followyou.unheard
     welcome = Welcome(hass, options, lambda: entry.runtime_data)
     welcome.async_start()
     entry.async_on_unload(welcome.async_stop)
@@ -345,13 +434,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
         motion_lights=motion_lights, timeline=timeline, notifier=notifier, welcome=welcome, mutes=mutes, critical=critical, shortcuts=shortcuts, left_open=left_open,
         feedback=feedback, heating=heating, night_watch=night_watch, followthrough=followthrough,
         lists=lists, offers=offers, announcements=announcements, alarms=alarms, checks=checks, camsec=camsec,
-        party=party, voice=VoiceID(hass, options), faces=visitors.faces,
+        party=party, followyou=followyou, loops=loops, conversations=conversations, curiosity=curiosity,
+        reflection=reflection, drive=drive, autooff=autooff, foresight=foresight, sleep=sleep,
+        ai=ai, appliances=appliances, animals=animals, watchdog=watchdog, screen=screen, away=away,
+        voice=VoiceID(hass, options), faces=visitors.faces,
     )
+    for engine in (followyou, loops, conversations, curiosity, reflection, drive, foresight, sleep, appliances, animals, watchdog, screen, away):
+        await engine.async_start()
+        entry.async_on_unload(engine.async_stop)
     await party.async_start()
     entry.async_on_unload(party.async_stop)
     night_watch.async_start()
     entry.async_on_unload(night_watch.async_stop)
-    for engine in (offers, announcements, alarms, checks, camsec):
+    for engine in (offers, announcements, alarms, checks, camsec, autooff):
         engine.async_start()
         entry.async_on_unload(engine.async_stop)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
@@ -379,7 +474,7 @@ async def _async_register_panel(hass: HomeAssistant, entry: ConfigEntry) -> None
         hass,
         frontend_url_path=PANEL_URL_PATH,
         webcomponent_name="sentient-panel",
-        module_url=f"{FRONTEND_URL}/sentient-panel.js?v={version}",
+        module_url=f"{FRONTEND_URL}/sentient-panel.js?v={(await hass.async_add_executor_job(_card_tags, ('sentient-panel',))).get('sentient-panel', version)}",
         sidebar_title=options.get(CONF_PERSONA) or entry.title,
         sidebar_icon="mdi:brain",
         require_admin=False,
@@ -412,6 +507,9 @@ async def _async_options_updated(hass: HomeAssistant, entry: SentientConfigEntry
     entry.runtime_data.night_watch.options = options
     entry.runtime_data.camsec.options = options
     entry.runtime_data.party.options = options
+    for name in ("followyou", "loops", "conversations", "curiosity", "reflection", "drive", "foresight", "sleep", "ai", "appliances", "animals", "watchdog", "screen", "away"):
+        getattr(entry.runtime_data, name).options = options
+    entry.runtime_data.drive.async_setup_triggers()
     hass.bus.async_fire(EVENT_MODE_CHANGED, {"options": True})  # switches refresh what they show
     entry.runtime_data.welcome.async_start()
     entry.runtime_data.health.async_check()
@@ -607,9 +705,103 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN, SERVICE_REMEMBER, remember, schema=REMEMBER_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
+    async def reflect(call: ServiceCall) -> ServiceResponse:
+        return await _runtime(hass).reflection.async_reflect()
+
+    async def house_asleep(call: ServiceCall) -> ServiceResponse:
+        return await _runtime(hass).sleep.async_set(call.data["asleep"], "set by hand")
+
+    hass.services.async_register(
+        DOMAIN, "set_asleep", house_asleep, schema=vol.Schema({vol.Required("asleep"): cv.boolean}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    async def show_on_screen(call: ServiceCall) -> ServiceResponse:
+        return _runtime(hass).screen.show(
+            call.data["message"], "service", alert=call.data.get("alert", False), camera=call.data.get("camera"),
+            minutes=call.data.get("minutes"),
+        )
+
+    async def clear_screen(call: ServiceCall) -> None:
+        _runtime(hass).screen.dismiss(call.data.get("card_id"))
+
+    async def morning_card(call: ServiceCall) -> ServiceResponse:
+        rt = _runtime(hass)
+        rt.screen.morning = None
+        return await rt.screen.async_morning() or {}
+
+    hass.services.async_register(
+        DOMAIN, "show_on_screen", show_on_screen, supports_response=SupportsResponse.OPTIONAL,
+        schema=vol.Schema({vol.Required("message"): cv.string, vol.Optional("camera"): cv.entity_id,
+                           vol.Optional("minutes"): vol.Coerce(float), vol.Optional("alert"): cv.boolean}),
+    )
+    hass.services.async_register(DOMAIN, "clear_screen", clear_screen,
+                                 schema=vol.Schema({vol.Optional("card_id"): cv.string}))
+    hass.services.async_register(DOMAIN, "morning_card", morning_card, supports_response=SupportsResponse.OPTIONAL)
+
+    async def look_ahead(call: ServiceCall) -> ServiceResponse:
+        return await _runtime(hass).foresight.async_look_ahead(speak=call.data.get("speak", False))
+
+    hass.services.async_register(
+        DOMAIN, "look_ahead", look_ahead, schema=vol.Schema({vol.Optional("speak", default=False): cv.boolean}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    async def drive_check(call: ServiceCall) -> ServiceResponse:
+        return await _runtime(hass).drive.async_check(force=True)
+
+    async def wonder(call: ServiceCall) -> ServiceResponse:
+        rt = _runtime(hass)
+        if call.data.get("dismiss"):
+            rt.curiosity.dismiss(call.data["dismiss"])
+        if call.data.get("question"):
+            rt.curiosity.wonder(call.data["question"], source="service")
+        if call.data.get("ask_now"):
+            return await rt.curiosity.async_ask(force=True)
+        return rt.curiosity.listing()
+
+    async def follow_up(call: ServiceCall) -> ServiceResponse:
+        d = call.data
+        return _runtime(hass).loops.add(
+            d["minutes"], d["about"], d.get("entity"), d.get("state"), d.get("above"), d.get("below"),
+            d.get("if_done"), d.get("if_not"), d.get("speaker"),
+        )
+
+    async def cancel_follow_up(call: ServiceCall) -> ServiceResponse:
+        gone = _runtime(hass).loops.cancel(call.data["about"])
+        return {"cancelled": gone}
+
+    hass.services.async_register(
+        DOMAIN, "cancel_follow_up", cancel_follow_up, schema=vol.Schema({vol.Required("about"): cv.string}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(DOMAIN, "reflect", reflect, supports_response=SupportsResponse.OPTIONAL)
+    hass.services.async_register(DOMAIN, "check_drive", drive_check, supports_response=SupportsResponse.OPTIONAL)
+    hass.services.async_register(
+        DOMAIN, "wonder", wonder,
+        schema=vol.Schema({vol.Optional("question"): cv.string, vol.Optional("dismiss"): cv.string,
+                           vol.Optional("ask_now", default=False): cv.boolean}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN, "follow_up", follow_up,
+        schema=vol.Schema({
+            vol.Required("minutes"): vol.All(vol.Coerce(float), vol.Range(min=1, max=1440)),
+            vol.Required("about"): cv.string,
+            vol.Optional("entity"): cv.entity_id,
+            vol.Optional("state"): cv.string,
+            vol.Optional("above"): vol.Coerce(float),
+            vol.Optional("below"): vol.Coerce(float),
+            vol.Optional("if_done"): cv.string,
+            vol.Optional("if_not"): cv.string,
+            vol.Optional("speaker"): cv.string,
+        }),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
     async def run_routine(call: ServiceCall) -> ServiceResponse:
         rt = _runtime(hass)
-        result = await rt.shortcuts.async_run(call.data["name"], call.context)
+        result = await rt.shortcuts.async_run(call.data["name"], call.context, call.data.get("details"))
         if result.get("said") and call.data.get("speak", True):
             await rt.speech.async_say(result["said"], "urgent", source="routine")
         if not result.get("error"):
@@ -618,7 +810,8 @@ def _register_services(hass: HomeAssistant) -> None:
 
     hass.services.async_register(
         DOMAIN, "run_routine", run_routine,
-        schema=vol.Schema({vol.Required("name"): cv.string, vol.Optional("speak", default=True): cv.boolean}),
+        schema=vol.Schema({vol.Required("name"): cv.string, vol.Optional("speak", default=True): cv.boolean,
+                           vol.Optional("details"): dict}),
         supports_response=SupportsResponse.OPTIONAL,
     )
 

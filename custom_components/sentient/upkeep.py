@@ -22,7 +22,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.util import dt as dt_util
 
-from .ai import ai_task_entity, async_generate
+from .ai import AIUnavailable, ai_task_entity, async_generate
 from .const import (
     personality_line,
     CONF_BRIEFING_CALENDARS,
@@ -110,6 +110,9 @@ async def gather_briefing(hass: HomeAssistant, rt: SentientRuntime) -> dict[str,
         if open_things:
             out["open_now"] = open_things
 
+    if (fy := getattr(rt, "followyou", None)) is not None and (thoughts := fy.pending_thoughts()):
+        out["overnight_thoughts"] = thoughts
+
     if "visitors" in want and (visits := rt.visitors.today()):
         out["visitors_today"] = [
             f"{dt_util.as_local(dt_util.parse_datetime(v['time'])).strftime('%-I:%M%p').lower()} "
@@ -126,6 +129,8 @@ async def gather_briefing(hass: HomeAssistant, rt: SentientRuntime) -> dict[str,
         from .security import check
 
         out["security"] = check(hass)["summary"]
+    if (animals := getattr(rt, "animals", None)) is not None and (outside := animals.out_of_range()):
+        out["animals_outside"] = outside
     if overnight := rt.night_watch.overnight(12):
         out["unusual_overnight"] = overnight
 
@@ -194,6 +199,30 @@ async def gather_briefing(hass: HomeAssistant, rt: SentientRuntime) -> dict[str,
             out["calendar_next_24h"] = events[:8]
     return out
 
+
+
+def plain_briefing(facts: dict[str, Any]) -> str:
+    """The briefing without the AI: the facts that matter, in plain sentences."""
+    out: list[str] = []
+    if weather := facts.get("weather"):
+        out.append(t("plain.weather", weather=weather))
+    if reminders := facts.get("reminders_today"):
+        out.append(t("plain.reminders", items="; ".join(reminders[:3])))
+    if open_now := facts.get("open_now"):
+        out.append(t("plain.open_one", name=open_now[0]) if len(open_now) == 1 else t("plain.open_many", names=", ".join(open_now[:4])))
+    if outside := facts.get("animals_outside"):
+        out.append(outside[0][:1].upper() + outside[0][1:] + ".")
+    if thoughts := facts.get("overnight_thoughts"):
+        out.append(str(thoughts[0]).rstrip(".") + ".")
+    if visitors := facts.get("visitors_today"):
+        out.append(t("plain.visitor") if len(visitors) == 1 else t("plain.visitors", n=len(visitors)))
+    if problems := (facts.get("system") or {}).get("problems"):
+        out.append(str(problems[0]).rstrip(".") + ".")
+    if overnight := facts.get("unusual_overnight"):
+        first = overnight[0] if isinstance(overnight, list) and overnight else overnight
+        if isinstance(first, str):
+            out.append(first.rstrip(".") + ".")
+    return " ".join(out[:5]) or t("plain.nothing")
 
 class Upkeep:
     """Briefings on request and the weekly memory tidy."""
@@ -329,16 +358,23 @@ class Upkeep:
     @callback
     def _weekly(self, now: datetime) -> None:
         if dt_util.as_local(now).weekday() == 6:
-            self.hass.async_create_background_task(self.async_tidy(), "sentient_tidy")
+            self.hass.async_create_background_task(self._async_tidy_quietly(), "sentient_tidy")
 
-    async def _ai(self, task: str, instructions: str, structure: dict | None) -> Any:
+    async def _async_tidy_quietly(self) -> None:
+        try:
+            await self.async_tidy()
+        except HomeAssistantError as err:  # the AI wasn't available: next week
+            _LOGGER.debug("Memory tidy skipped: %s", err)
+
+    async def _ai(self, task: str, instructions: str, structure: dict | None, purpose: str = "upkeep") -> Any:
         rt = self._rt()
         data: dict[str, Any] = {"task_name": task, "instructions": instructions + i18n.write_in()}
         if structure:
             data["structure"] = structure
         if ai_entity := ai_task_entity(self.hass, rt.options):
             data["entity_id"] = ai_entity
-        rt.watches.spend()
+        if not rt.watches.spend(purpose):
+            raise AIUnavailable("today's AI limit is used up")
         response = await async_generate(self.hass, data)
         return (response or {}).get("data")
 
@@ -350,19 +386,28 @@ class Upkeep:
         facts = await gather_briefing(self.hass, rt)
         persona = rt.options.get(CONF_PERSONA) or DEFAULT_PERSONA
         rules = (rt.options.get(CONF_HOUSE_RULES) or "").strip()
-        text = await self._ai(
-            "Sentient: briefing",
-            f"You are {persona}, the brain of a family home. Write a spoken briefing of two to four short, "
-            "natural sentences from these facts. Lead with what needs doing; skip "
-            "anything empty; no lists, no IDs, no forms of address. " + personality_line(rt.options)
-            + (f"\nHouse rules:\n{rules}" if rules else "")
-            + f"\nFacts: {facts}",
-            None,
-        )
-        message = str(text or "").strip()
+        try:
+            text = await self._ai(
+                "Sentient: briefing",
+                f"You are {persona}, the brain of a family home. Write a spoken briefing of two to four short, "
+                "natural sentences from these facts. Lead with what needs doing; skip "
+                "anything empty; no lists, no IDs, no forms of address. Mention system readings (computer "
+                "temperature, disk, memory) only when they're listed as problems, never as small talk. "
+                + personality_line(rt.options)
+                + (f"\nHouse rules:\n{rules}" if rules else "")
+                + f"\nFacts: {facts}",
+                None,
+                "briefing",
+                )
+        except AIUnavailable as err:
+            _LOGGER.info("Briefing in plain words: %s", err)
+            text = None
+        message = str(text or "").strip() if isinstance(text, (str, type(None))) else ""
         if not message:
-            raise HomeAssistantError("The AI didn't write a briefing")
+            message = plain_briefing(facts)  # the AI couldn't: say the facts plainly
         result = await rt.speech.async_say(message, priority, None, source="briefing")
+        if result.spoken and facts.get("overnight_thoughts"):
+            rt.followyou.take_thoughts()  # said in the briefing: don't say them again
         return {**result.as_dict(), "facts": facts}
 
     # ----- memory tidy -------------------------------------------------------------

@@ -8,6 +8,8 @@ That gives every voice in the house one shared brain.
 
 from __future__ import annotations
 
+import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
@@ -17,11 +19,14 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import llm
 from homeassistant.util import dt as dt_util
 from homeassistant.util.json import JsonObjectType
 
 from .const import (
+    CONF_FALLBACK_SPEAKERS,
+    CONF_BRIEFING_WEATHER,
     personality_line,
     CONF_HOUSE_RULES,
     CONF_PERSONA,
@@ -47,10 +52,39 @@ def _runtime(hass: HomeAssistant) -> SentientRuntime | None:
     return entries[0].runtime_data if entries else None
 
 
+_LOGGER = logging.getLogger(__name__)
+
+
 class _Tool(llm.Tool):
     """Every Sentient tool says which integration provides it."""
 
     integration = DOMAIN
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Check every tool's arguments first, and never let a tool crash the whole conversation.
+
+        Home Assistant passes the model's arguments straight through, so a missing one would raise
+        a KeyError and the voice would fail. Bad arguments go back to the model as an error it can fix.
+        """
+        super().__init_subclass__(**kwargs)
+        inner = cls.__dict__.get("async_call")
+        if inner is None:
+            return
+
+        async def async_call(self, hass, tool_input, llm_context):  # type: ignore[no-untyped-def]
+            try:
+                tool_input.tool_args = self.parameters(dict(tool_input.tool_args or {}))
+            except vol.Invalid as err:
+                return {"error": f"wrong arguments: {err}"}
+            try:
+                return await inner(self, hass, tool_input, llm_context)
+            except HomeAssistantError:
+                raise
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("Sentient tool %s failed: %r", self.name, err)
+                return {"error": f"that didn't work ({type(err).__name__})"}
+
+        cls.async_call = async_call
 
 
 def _read_only() -> Any:
@@ -87,6 +121,28 @@ class RememberTool(_Tool):
             source=llm_context.platform,
         )
         return {"saved": memory.text, "id": memory.id}
+
+
+class CorrectionTool(_Tool):
+    name = "sentient_correction"
+    description = (
+        "When someone corrects you — 'no, I meant the lamp', 'not that one', 'that's the wrong room', "
+        "'I said the girls' room' — first put it right, then call this with one short lesson so it never "
+        "happens again, in any room or voice. Say what was meant, and where if it matters, e.g. "
+        "'In the living room, \"the light\" means the lamp, not the ceiling light.' or "
+        "'\"The big light\" means the ceiling light.' Not for ordinary facts — use sentient_remember for those."
+    )
+    parameters = vol.Schema({vol.Required("lesson"): cv.string})
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        memory = rt.memory.add(tool_input.tool_args["lesson"], "correction", source=llm_context.platform)
+        rt.timeline.add("learned", f"Corrected: {memory.text}", "from a conversation")
+        return {"learned": memory.text}
 
 
 class RecallTool(_Tool):
@@ -130,12 +186,16 @@ class ForgetTool(_Tool):
         return {"forgotten": removed.text if removed else None}
 
 
+EVERYWHERE = re.compile(r"(the )?(everywhere|every ?(one|body|room|speaker)s?|all( the)?( (speakers|rooms))?|(the )?whole house|all over( the house)?|house)")
+
+
 class AnnounceTool(_Tool):
     name = "sentient_announce"
     description = (
         "Say something out loud through the house's speakers, e.g. 'tell the kitchen "
-        "dinner is ready'. Leave 'speaker' empty to use the room where someone was last "
-        "seen. Respects quiet hours unless priority is urgent."
+        "dinner is ready'. 'speaker' can be one room, several ('kitchen and upstairs') or "
+        "'everywhere' for every speaker in the house. Leave it empty to use the room where someone "
+        "was last seen. Respects quiet hours unless priority is urgent."
     )
     parameters = vol.Schema(
         {
@@ -153,12 +213,21 @@ class AnnounceTool(_Tool):
             return {"error": "Sentient is not loaded"}
         args = tool_input.tool_args
         targets = None
-        if args.get("speaker"):
-            found = rt.speech.find_speaker(args["speaker"])
-            if found is None:
-                return {"spoken": False, "reason": f"no speaker matches '{args['speaker']}'",
-                        "speakers": rt.speech.describe_rooms()}
-            targets = [found]
+        if wanted := (args.get("speaker") or "").strip():
+            if EVERYWHERE.fullmatch(wanted.lower()):
+                targets = rt.speech.speakers + [s for s in rt.speech.usable(rt.options.get(CONF_FALLBACK_SPEAKERS))
+                                                if s not in rt.speech.speakers]
+            else:
+                targets = []
+                for part in re.split(r",|\band\b|&|\+", wanted):
+                    if not (part := part.strip()):
+                        continue
+                    found = rt.speech.find_speaker(part)
+                    if found is None:
+                        return {"spoken": False, "reason": f"no speaker matches '{part}'",
+                                "speakers": rt.speech.describe_rooms()}
+                    if found not in targets:
+                        targets.append(found)
         result = await rt.speech.async_say(
             args["message"], args.get("priority", "normal"), targets, source="conversation"
         )
@@ -840,7 +909,7 @@ class SpotTool(_Tool):
         camera = resolve_entity(hass, args.get("camera") or "", "camera")
         if camera is None or not camera.startswith("camera."):
             return {"error": "Which camera is it on?"}
-        rt.watches.spend()
+        rt.watches.spend("question", force=True)
         try:
             spot = await rt.spots.async_learn(camera, args["name"])
         except HomeAssistantError as err:
@@ -975,9 +1044,11 @@ class RunRoutineTool(_Tool):
     name = "sentient_run_routine"
     description = (
         "Run one of the household's named routines (e.g. 'goodnight', 'good morning', 'leaving'). "
-        "Returns what to tell the person — say it in your reply (the house doesn't announce it)."
+        "Returns what to tell the person — say it in your reply (the house doesn't announce it). Some "
+        "routines take details (listed in your instructions, e.g. which rooms): pass them in 'details' as "
+        "{name: value}, a list for several."
     )
-    parameters = vol.Schema({vol.Required("name"): cv.string})
+    parameters = vol.Schema({vol.Required("name"): cv.string, vol.Optional("details"): dict})
 
     async def async_call(
         self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
@@ -985,7 +1056,9 @@ class RunRoutineTool(_Tool):
         rt = _runtime(hass)
         if rt is None:
             return {"error": "Sentient is not loaded"}
-        result = await rt.shortcuts.async_run(tool_input.tool_args["name"], llm_context.context)
+        result = await rt.shortcuts.async_run(
+            tool_input.tool_args["name"], llm_context.context, tool_input.tool_args.get("details")
+        )
         if not result.get("error"):
             rt.timeline.add("mode", f"Ran {result['routine']} (by voice)", result.get("said") or None)
         return result
@@ -1075,6 +1148,163 @@ class ScenesTool(_Tool):
         return {"error": f"No scene or routine called {name}"}
 
 
+class FollowUpTool(_Tool):
+    name = "sentient_follow_up"
+    description = (
+        "Check back on something later and tell people how it went — close the loop instead of forgetting. "
+        "Use when you start something that takes time (heating a room, a wash, a delivery due, a door someone "
+        "said they'd shut). Give 'minutes' and 'about' (a few words). To check a device, give 'entity' and "
+        "'state', or 'above'/'below' for numbers; optionally 'if_done' and 'if_not', the exact sentences to "
+        "say either way. Without an entity, 'if_done' (or 'about') is simply said then."
+    )
+    parameters = vol.Schema(
+        {
+            vol.Required("minutes"): vol.Coerce(float),
+            vol.Required("about"): cv.string,
+            vol.Optional("entity"): cv.string,
+            vol.Optional("state"): cv.string,
+            vol.Optional("above"): vol.Coerce(float),
+            vol.Optional("below"): vol.Coerce(float),
+            vol.Optional("if_done"): cv.string,
+            vol.Optional("if_not"): cv.string,
+            vol.Optional("cancel"): cv.boolean,
+        }
+    )
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        a = tool_input.tool_args
+        if a.get("cancel"):
+            gone = rt.loops.cancel(a["about"])
+            return {"cancelled": gone} if gone else {"error": "No follow-up like that"}
+        entity = a.get("entity")
+        if entity and hass.states.get(entity) is None:
+            from .watches import resolve_entity
+
+            entity = resolve_entity(hass, entity)
+            if entity is None:
+                return {"error": f"I can't find {a['entity']}"}
+        speaker = None
+        if llm_context.device_id:
+            speaker = next((s for s in rt.speech.speakers
+                            if (e := er.async_get(hass).async_get(s)) and e.device_id == llm_context.device_id), None)
+        return {"follow_up": rt.loops.add(
+            a["minutes"], a["about"], entity, a.get("state"), a.get("above"), a.get("below"),
+            a.get("if_done"), a.get("if_not"), speaker,
+        )}
+
+
+class ConversationsTool(_Tool):
+    annotations = _read_only()
+    name = "sentient_conversations"
+    description = (
+        "What was asked and said in earlier conversations, on any speaker in the house — for 'what was I "
+        "asking earlier?', 'what did you tell me about…', or picking up where someone left off in another "
+        "room. Optional 'query' words and 'days' (default 2)."
+    )
+    parameters = vol.Schema({vol.Optional("query"): cv.string, vol.Optional("days"): vol.Coerce(float)})
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        if rt.speech.guest_mode:
+            return {"error": "Guests are visiting: earlier conversations stay private"}
+        a = tool_input.tool_args
+        return {"conversations": rt.conversations.search(a.get("query"), float(a.get("days") or 2))}
+
+
+class WhyTool(_Tool):
+    annotations = _read_only()
+    name = "sentient_why"
+    description = (
+        "Explain why something happened or changed — 'why did the landing light go off?', 'who turned the "
+        "heating up?', 'why did you say that?' — or why something WASN'T said: 'why didn't you tell me the "
+        "washing had finished?'. Give 'what' (a device, a room or words from what was said). Returns when it last "
+        "changed, whether a person (and in which app), an automation or the house did it, the house's own log "
+        "around then (including anything held back and why), and things it noticed but chose not to say. "
+        "Answer from these facts in a sentence or two; never guess."
+    )
+    parameters = vol.Schema({vol.Required("what"): cv.string, vol.Optional("hours"): vol.Coerce(float)})
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        from .explain import async_explain
+
+        a = tool_input.tool_args
+        return await async_explain(hass, rt, a["what"], float(a.get("hours") or 12))
+
+
+class HouseCheckTool(_Tool):
+    annotations = _read_only()
+    name = "sentient_house_check"
+    description = (
+        "Everything about the house at once, for a broad request — 'get the house ready for a cold night', "
+        "'anything I need to sort before bed?', 'check the house', 'get ready for the morning'. Returns doors and "
+        "windows open and the alarm, lights and fans left on, the heating now and when it needs to start to be "
+        "warm tomorrow, tomorrow's weather, animals living outside, appliances running, today's biggest energy "
+        "users and anything offline or wearing out. Then do what's needed with your other tools (never the "
+        "alarm unless asked), and say in two or three sentences what you did and what still needs a person."
+    )
+    parameters = vol.Schema({})
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        from .security import check
+
+        sec = check(hass)
+        out: dict[str, Any] = {
+            "security": {"summary": sec["summary"], "open": [i["name"] for i in sec["open"]],
+                         "unlocked": [i["name"] for i in sec["unlocked"]],
+                         "alarm": [f"{a['name']}: {a['state']}" for a in sec["alarms"]]},
+            "house": "asleep" if rt.sleep.asleep else "awake",
+        }
+        on = [s.name for s in hass.states.async_all(("light", "fan"))
+              if s.state == "on" and not isinstance(s.attributes.get("entity_id"), list)]
+        out["lights_and_fans_on"] = on[:20]
+        out["heating"] = [{k: z[k] for k in ("name", "now", "comfortable_at", "warm_by", "needs_to_start") if z.get(k) is not None}
+                          for z in rt.heating.report()["zones"]]
+        for st in hass.states.async_all("climate"):
+            out.setdefault("thermostats", []).append(
+                f"{st.name}: {st.state}, set to {st.attributes.get('temperature')}°, now {st.attributes.get('current_temperature')}°")
+        try:
+            tomorrow = await rt.foresight.gather()
+            out["tomorrow"] = {k: v for k, v in tomorrow.items() if k in ("tomorrow", "weather", "calendar", "alarms_tomorrow")}
+        except Exception:  # noqa: BLE001
+            pass
+        if animals := rt.animals.readings():
+            out["animals_outside"] = animals
+        if running := [a for a in rt.appliances.listing() if a["running"]]:
+            out["appliances_running"] = [f"{a['name']} since {a['started']}" + (f", done about {a['done_about']}" if a.get("done_about") else "")
+                                         for a in running]
+        try:
+            from .energy import async_report, describe
+
+            report = await async_report(hass)
+            if report.get("devices"):
+                out["energy_today"] = {"biggest": [f"{d['name']} {d['kwh']} kWh" for d in report["devices"][:3]],
+                                       "unusual": describe(report)}
+        except Exception:  # noqa: BLE001
+            pass
+        if problems := rt.health.describe():
+            out["problems"] = problems[:8]
+        return out
+
+
 class SentientAPI(llm.API):
     """Shared brain exposed to conversation agents."""
 
@@ -1082,13 +1312,23 @@ class SentientAPI(llm.API):
         super().__init__(hass=hass, id=LLM_API_ID, name="Sentient")
 
     async def async_get_api_instance(self, llm_context: llm.LLMContext) -> llm.APIInstance:
+        conversation_id = None
+        try:
+            from homeassistant.components.conversation.chat_log import current_chat_log
+
+            if (chat := current_chat_log.get()) is not None:
+                conversation_id = chat.conversation_id
+        except ImportError:
+            pass
+        if conversation_id and (rt := _runtime(self.hass)) is not None:
+            rt.conversations.attach(conversation_id, llm_context.device_id, llm_context.platform)
         return llm.APIInstance(
             api=self,
-            api_prompt=self._prompt(llm_context),
+            api_prompt=self._prompt(llm_context, conversation_id),
             llm_context=llm_context,
-            tools=[RememberTool(), RecallTool(), ForgetTool(), AnnounceTool(),
+            tools=[RememberTool(), CorrectionTool(), HouseCheckTool(), RecallTool(), ForgetTool(), AnnounceTool(),
                    WatchTool(), RemindTool(), ListWatchesTool(), CancelWatchTool(), LookTool(),
-                   RoutinesTool(), AdoptRoutineTool(), ForgetRoutineTool(), AcceptOfferTool(), AlarmTool(), PartyTool(), HeatingTool(), NightWatchTool(), WeeklyTool(), BriefingTool(), VisitorsTool(), SpotTool(), MotionLightsTool(), TimelineTool(), QuietTool(), ShushTool(), RunRoutineTool(), EnergyTool(), SecurityTool(), ScenesTool(), CalendarEventTool()]
+                   RoutinesTool(), AdoptRoutineTool(), ForgetRoutineTool(), AcceptOfferTool(), AlarmTool(), PartyTool(), HeatingTool(), NightWatchTool(), WeeklyTool(), BriefingTool(), VisitorsTool(), SpotTool(), MotionLightsTool(), TimelineTool(), QuietTool(), ShushTool(), RunRoutineTool(), EnergyTool(), SecurityTool(), ScenesTool(), FollowUpTool(), ConversationsTool(), WhyTool(), CalendarEventTool()]
                   + ([LearnVoiceTool(), VoicesTool(), ForgetVoiceTool(), LearnFaceTool(), FacesTool(), ForgetFaceTool()]
                      if self._voice_on() else []),
         )
@@ -1127,7 +1367,7 @@ class SentientAPI(llm.API):
         )
         return out
 
-    def _prompt(self, llm_context: llm.LLMContext) -> str:
+    def _prompt(self, llm_context: llm.LLMContext, conversation_id: str | None = None) -> str:
         rt = _runtime(self.hass)
         if rt is None:
             return "Sentient (the house's long-term brain) is not loaded right now."
@@ -1139,6 +1379,22 @@ class SentientAPI(llm.API):
             personality_line(opts),
             f"Local time: {dt_util.now().strftime('%A %d %B %Y, %H:%M')}.",
         ]
+        weather_id = opts.get(CONF_BRIEFING_WEATHER)
+        weather = self.hass.states.get(weather_id) if weather_id else next(
+            (w for w in self.hass.states.async_all("weather") if w.attributes.get("temperature") is not None), None)
+        if weather is not None and weather.attributes.get("temperature") is not None:
+            unit = weather.attributes.get("temperature_unit") or "°C"
+            lines.append(
+                f"Outside right now: {round(float(weather.attributes['temperature']))}{unit}, "
+                f"{str(weather.state).replace('partlycloudy', 'partly cloudy').replace('-', ' ')}. This is the only "
+                "outside temperature: never give a room or thermostat temperature as the weather. If another "
+                "tool gives a different current temperature, this one is right."
+            )
+        elif weather_id or self.hass.states.async_all("weather"):
+            lines.append(
+                "The outside temperature isn't known right now (the weather hasn't updated). If asked, say so: "
+                "never give a room or thermostat temperature as the weather."
+            )
         if rules := (opts.get(CONF_HOUSE_RULES) or "").strip():
             lines.append(f"House rules you must always follow:\n{rules}")
         room = self._room_of_device(llm_context.device_id)
@@ -1150,15 +1406,40 @@ class SentientAPI(llm.API):
                 "Guests are visiting: don't bring up personal household details, routines or memories "
                 "unless someone explicitly asks."
             )
+        usual = rt.sleep.usual()
+        if usual["bedtime"] or usual["up"]:
+            lines.append(
+                "The household usually " + " and ".join(
+                    x for x in (f"goes to bed around {usual['bedtime']}" if usual["bedtime"] else "",
+                                f"is up around {usual['up']}" if usual["up"] else "") if x
+                ) + "."
+            )
+        if rt.sleep.asleep:
+            lines.append(f"The house is asleep (since {rt.sleep.describe()['since']}): keep replies short and quiet.")
         if rt.speech.hushed():
             lines.append("The house has been asked to stay quiet: keep replies short and don't announce anything.")
         elif rt.speech.quiet_now():
             lines.append("It is quiet hours: keep replies short and don't announce elsewhere unless urgent.")
-        memories = rt.memory.recent(int(opts.get(CONF_PROMPT_MEMORIES, DEFAULT_PROMPT_MEMORIES)))
+        lessons = [m for m in rt.memory.items if m.category == "correction"][-15:]
+        if lessons:
+            lines.append("You've been corrected on these before — get them right first time:")
+            lines.extend(f"- {m.text}" for m in lessons)
+        memories = [m for m in rt.memory.recent(int(opts.get(CONF_PROMPT_MEMORIES, DEFAULT_PROMPT_MEMORIES)) + len(lessons))
+                    if m.category != "correction"][: int(opts.get(CONF_PROMPT_MEMORIES, DEFAULT_PROMPT_MEMORIES))]
         if memories:
             lines.append("Things you know about this household:")
             lines.extend(f"- {m.text}" for m in memories)
             lines.append("Use sentient_recall for anything not listed here.")
+        if not rt.speech.guest_mode and (talk := rt.conversations.prompt_lines(exclude=conversation_id)):
+            lines.append(
+                "Recent conversations on the house's speakers (any room) — pick up where they left off if it's "
+                "relevant; sentient_conversations has more:"
+            )
+            lines.extend(talk)
+        if drive := rt.drive.prompt_line():
+            lines.append(drive)
+        if rt.loops.items:
+            lines.append("Follow-ups you've set: " + "; ".join(f"{i['about']} at {i['at']}" for i in rt.loops.listing()[:6]) + ".")
         if spots := rt.spots.describe():
             lines.append(
                 "Named camera spots — for questions about these, call sentient_look with the spot; it picks "
@@ -1183,7 +1464,11 @@ class SentientAPI(llm.API):
         if rt.shortcuts.items:
             lines.append(
                 "Named routines you can run with sentient_run_routine: "
-                + ", ".join(s.name for s in rt.shortcuts.items.values()) + "."
+                + "; ".join(
+                    s.name + (" (details: " + ", ".join(f"{k} = {w}" for k, w in s.input_names().items()) + ")"
+                              if s.input_names() else "")
+                    for s in rt.shortcuts.items.values()
+                ) + "."
             )
         if problems := rt.health.describe():
             lines.append("House health problems right now: " + "; ".join(problems[:6]) + ".")
@@ -1201,6 +1486,17 @@ class SentientAPI(llm.API):
             "When someone asks you to keep an eye on something, or to tell them when something "
             "happens, use sentient_watch; to be reminded at a time, use sentient_remind; to put "
             "something in the calendar, use sentient_add_calendar_event. Never just promise to remember."
+        )
+        lines.append("When someone asks why something happened or who did it, use sentient_why rather than guessing.")
+        lines.append("When someone corrects you, put it right and save the lesson with sentient_correction.")
+        if gate := getattr(rt, "ai", None):
+            if gate.failing or gate.capped:
+                lines.append("The house's background AI is unavailable right now, so its own remarks are in plain words.")
+        if running := rt.appliances.prompt_line():
+            lines.append(running)
+        lines.append(
+            "When you start something that takes a while to show results (heating, a wash, a delivery), set a "
+            "sentient_follow_up so you check back and say how it went."
         )
         if i18n.lang() != "en":
             lines.append(f"Always speak and answer in {i18n.language_name()}.")

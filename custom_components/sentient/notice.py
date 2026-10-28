@@ -51,6 +51,7 @@ _LOGGER = logging.getLogger(__name__)
 BATCH_SECONDS = 20
 NUMERIC_GAP = timedelta(minutes=15)
 OTHER_GAP = timedelta(seconds=30)
+_WET_WEATHER = {"rainy", "pouring", "snowy", "snowy-rainy", "hail", "lightning", "lightning-rainy", "fog", "exceptional"}
 _IGNORED = {STATE_UNAVAILABLE, STATE_UNKNOWN, None}
 _RESTING = {"off", "standby", "idle", "docked", "paused", "stopped", "done", "ready", "complete", "finished"}
 _GOING = {"on", "heating", "boiling", "running", "cleaning", "brewing", "playing", "washing", "drying", "cooking"}
@@ -115,6 +116,7 @@ class Noticer:
         self.speech = speech
         self.memory = memory
         self.watches = watches
+        self.skip: Any = None  # () -> entity ids handled elsewhere (appliances)
         self._pending: list[Change] = []
         self._last_seen: dict[str, datetime] = {}
         self._remarks: deque[datetime] = deque(maxlen=50)
@@ -152,6 +154,8 @@ class Noticer:
         new = event.data["new_state"]
         if new is None or new.entity_id not in self.entities or self.per_hour <= 0:
             return
+        if self.skip is not None and new.entity_id in self.skip():
+            return  # an appliance: it says when it's finished itself, in plain words
         if self.speech.mutes is not None and self.speech.mutes.entity_muted(new.entity_id):
             return
         if self.feedback is not None and self.feedback.remark_level(new.entity_id) == "quiet":
@@ -159,6 +163,8 @@ class Noticer:
         old = event.data["old_state"]
         if old is None or old.state in _IGNORED or new.state in _IGNORED or old.state == new.state:
             return  # appearing at start-up, coming back from unavailable, or attribute-only
+        if new.domain == "weather" and not ({old.state, new.state} & _WET_WEATHER):
+            return  # sunny ↔ cloudy isn't news; rain, snow, storms and fog starting or stopping are
         now = dt_util.utcnow()
         numeric = _number(new.state) is not None
         last = self._last_seen.get(new.entity_id)
@@ -236,7 +242,7 @@ class Noticer:
         if reason := self._free_rules():
             record["result"] = f"skipped: {reason}"
             return record
-        if not self.watches.spend():
+        if not self.watches.spend("noticing"):
             record["result"] = "skipped: daily AI limit reached"
             return record
         try:
@@ -254,9 +260,9 @@ class Noticer:
         record["message"] = decision.get("message")
         if speak:
             self._remarks.append(dt_util.utcnow())
-            if self.feedback is not None:
-                self.feedback.remarked([c.entity_id for c in changes])
             message = decision["message"].strip()
+            if self.feedback is not None:
+                self.feedback.remarked([c.entity_id for c in changes], message)
             if decision.get("question"):
                 result = await self.speech.async_ask(message, source="notice")
             else:
@@ -300,6 +306,9 @@ class Noticer:
                     "People have made it clear they don't want to hear about these unless it really matters "
                     "(needs action, safety, money): " + ", ".join(reluctant) + "."
                 )
+        if self.feedback is not None and self.feedback.liked:
+            lines.append("Remarks people gave a thumbs up to (the kind of thing worth saying):\n"
+                         + "\n".join(f"- {t}" for t in self.feedback.liked[:5]))
         said = self.speech.recent_said(6)
         if said:
             lines.append("What you've said recently (don't repeat yourself):\n" + "\n".join(f"- {s}" for s in said))

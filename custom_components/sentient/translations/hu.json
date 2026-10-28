@@ -47,7 +47,19 @@
           "chime": "Csengőhang beszéd előtt",
           "voice_stt_base": "A hangfelismerés mögötti beszédfelismerő",
           "voice_id_url": "A Voice ID app címe",
-          "embed_url": "A szemantikus memória címe"
+          "embed_url": "A szemantikus memória címe",
+          "voice_agent": "Fő AI hangasszisztens",
+          "backup_agent": "Tartalék asszisztens",
+          "animal_sensors": "Állatok hőmérséklet-érzékelői",
+          "away_lights_on": "Távolléti világítás",
+          "away_people": "Távol van, ha ezek mind elmentek",
+          "away_lights": "Használt lámpák",
+          "away_after": "Indulás, ha mindenki ennyi ideje távol van",
+          "animal_low": "Túl hideg ez alatt",
+          "animal_high": "Túl meleg e fölött",
+          "screen": "Tablet képernyő használata",
+          "screen_actions": "Ha valami megjelenik",
+          "screen_clear_actions": "Ha minden eltűnt"
         },
         "data_description": {
           "motion_window": "Hány perc mozgáselőzményt vegyen figyelembe, amikor eldönti, hol vannak az emberek.",
@@ -76,7 +88,19 @@
           "health_ignore": "Entitások (és eszközeik), amelyek nem számítanak hibának, pl. valami, aminek ki kell lennie kapcsolva.",
           "voice_stt_base": "A Sentient hang-STT-je ennek adja tovább a hangot a szövegért (pl. Home Assistant Cloud). Üresen az első másikat használja.",
           "voice_id_url": "Ahol a Sentient Voice ID app figyel, pl. http://xxxxxxxx-sentient-voice-id:8765. Üresen a hangfelismerés ki van kapcsolva.",
-          "embed_url": "Ahol a Sentient app szövegmodellje figyel (ugyanaz az app, mint a Voice ID). Üresen a Voice ID címét használja; ha az sincs, csak kulcsszó alapján keres."
+          "embed_url": "Ahol a Sentient app szövegmodellje figyel (ugyanaz az app, mint a Voice ID). Üresen a Voice ID címét használja; ha az sincs, csak kulcsszó alapján keres.",
+          "voice_agent": "A normál esetben válaszoló AI asszisztens (pl. Google AI). Üresen az oldal csevegő-asszisztensét használja.",
+          "backup_agent": "Akkor válaszol, ha a fő asszisztens hibázik — a Home Assistant saját asszisztense AI nélkül is kezeli a lámpákat, a fűtést és az időzítőket.",
+          "animal_sensors": "Ketrec, kutyaház, ól vagy terrárium hőmérséklet-érzékelői.",
+          "away_lights_on": "Ha sötétedés után mindenki elment, a lámpák úgy működnek, mint egy héttel korábban ugyanekkor (a Home Assistant előzményei alapján), pár perc eltéréssel. Nem indul el (vagy leáll), ha valaki otthon van, vagy nemrég mozgás volt bent – a telefon nélküli emberek miatt –, és visszaállítja, amit bekapcsolt. Van hozzá 'Távolléti világítás' kapcsoló is.",
+          "away_people": "Üresen: mindenki, akinek van személy-bejegyzése.",
+          "away_lights": "Üresen: minden szobában lévő lámpa, kivéve a kijelzőket, LED-gyűrűket, háttérvilágításokat és csoportokat. Csak azok a lámpák kapcsolnak, amelyek egy héttel korábban ilyenkor égtek.",
+          "away_after": "Hogy egy gyors bolti út ne indítsa el.",
+          "animal_low": "Egyszer szól, ha ez alá csökken (csendes órákban reggelig vár vele), és fagy előtt este figyelmeztet.",
+          "animal_high": "Egyszer szól, ha e fölé emelkedik.",
+          "screen": "Riasztások, értesítések és reggeli kártya a Sentient képernyő-kártyán (custom:sentient-screen-card). Kikapcsolva csak a ház áttekintését mutatja.",
+          "screen_actions": "pl. a tablet felébresztése és a képernyő-kártyás oldalra váltás.",
+          "screen_clear_actions": "pl. a tablet visszaváltása a szokásos oldalára."
         }
       }
     },
@@ -175,7 +199,44 @@
           "party_exclude": "Ezeket a lámpákat soha",
           "party_sound": "A hangot kövesse innen",
           "party_show": "Gombok az áttekintőn",
-          "party_sound_switch": "Bekapcsolás hallgatás közben"
+          "party_sound_switch": "Bekapcsolás hallgatás közben",
+          "room_volume": "Hangosabban zajos szobában",
+          "follow_you": "Az üzenetek követik az embereket",
+          "follow_minutes": "Továbbadandó üzenetek megőrzése",
+          "conversation_memory": "Beszélgetések megjegyzése",
+          "follow_ups": "Visszatérés a dolgokra",
+          "curiosity": "Kíváncsiság",
+          "reflection": "Éjszakai átgondolás",
+          "reflection_time": "Átgondolás ideje",
+          "drive_spot": "Behajtó terület",
+          "drive_camera": "Behajtó kamera",
+          "drive_triggers": "Nézzen rá, ha ezek megnyugszanak",
+          "full_volume_speakers": "Teljes hangerő ezeken a hangszórókon",
+          "tts_entity": "Hang a többi hangszóróhoz",
+          "media_speakers": "Echók és más médialejátszók használata",
+          "media_important_only": "Echók: csak ébresztők és emlékeztetők",
+          "foresight": "Előretekintés a holnapra",
+          "foresight_time": "Előretekintés ideje",
+          "sleep_detection": "Tudja, mikor alszik a ház",
+          "sleep_minutes": "Alszik, ha ennyi ideig semmi sem mozdult",
+          "bedtime_routines": "Lefekvési rutinok",
+          "sleep_actions": "Amikor a ház elalszik",
+          "wake_actions": "Amikor valaki felkel",
+          "appliances": "Követett háztartási gépek",
+          "appliance_announce": "Szóljon, ha végeztek",
+          "appliance_watts": "Működik e fölött",
+          "voice_agent": "Fő AI hangasszisztens",
+          "backup_agent": "Tartalék asszisztens",
+          "animal_sensors": "Állatok hőmérséklet-érzékelői",
+          "away_lights_on": "Távolléti világítás",
+          "away_people": "Távol van, ha ezek mind elmentek",
+          "away_lights": "Használt lámpák",
+          "away_after": "Indulás, ha mindenki ennyi ideje távol van",
+          "animal_low": "Túl hideg ez alatt",
+          "animal_high": "Túl meleg e fölött",
+          "screen": "Tablet képernyő használata",
+          "screen_actions": "Ha valami megjelenik",
+          "screen_clear_actions": "Ha minden eltűnt"
         },
         "data_description": {
           "motion_window": "Hány perc mozgáselőzményt vegyen figyelembe, amikor eldönti, hol vannak az emberek.",
@@ -246,7 +307,44 @@
           "party_exclude": "Minden showból kimarad, a 'mindenhol'-ból is – tabletek kijelzője, projektor, hálószoba, ahol alszik valaki.",
           "party_sound": "Nem kötelező: egy hangerő-érzékelő dB-ben, pl. egy hangszóró mikrofonja az ESPHome sound_level érzékelőjén át. A diszkó, buli, szivárvány és Halloween ekkor követi a zenét – hangosabb = fényesebb, minden ütemre színt vált.",
           "party_show": "Mely showk kapjanak gombot az áttekintőn. Üresen egyik sem; hanggal mindegyik működik.",
-          "party_sound_switch": "Nem kötelező: kapcsoló, amitől a hangerő-érzékelő mér (hogy ne küldjön adatot egész nap). Bekapcsol, amíg a show követi a hangot, utána ki. Magától megtalálja, ha ugyanazon az eszközön van és a nevében 'loudness' szerepel."
+          "party_sound_switch": "Nem kötelező: kapcsoló, amitől a hangerő-érzékelő mér (hogy ne küldjön adatot egész nap). Bekapcsol, amíg a show követi a hangot, utána ki. Magától megtalálja, ha ugyanazon az eszközön van és a nevében 'loudness' szerepel.",
+          "room_volume": "Azok a hangszórók, amelyek hallják a szobát (hangerő-érzékelő ugyanazon az eszközön), előbb egy másodpercig hallgatóznak, és hangosabban szólnak tévé vagy beszélgetés mellett. Csendes órákban nem.",
+          "follow_you": "Amit ott mondott, ahol senki sem volt – vagy a csendes órák miatt visszatartott –, azt továbbadja, amikor legközelebb valaki belép egy hangszórós szobába.",
+          "follow_minutes": "Ennyi idő után a meg nem hallott üzenet elvész.",
+          "conversation_memory": "Rövid feljegyzést vezet arról, mit kérdeztek és mondtak az egyes hangszórókon, így egy másik szoba ott folytathatja, ahol az egyik abbahagyta. Két hétig őrzi; vendégek alatt privát.",
+          "follow_ups": "A hangasszisztensek visszatérést állíthatnak be („egy óra múlva megnézem, felmelegedett-e a szoba”), és az eredmény nélkül lejárt figyelést hangosan lezárja.",
+          "curiosity": "Naponta legfeljebb egyszer, amikor valaki a közelben van, rákérdez valamire, amit nem tud megmagyarázni – egy rendszeres látogatóra, egy éjjel észrevett mintára –, és megjegyzi a választ.",
+          "reflection": "Éjszakánként egy AI-hívás a nap eseményeiről és beszélgetéseiről: új megjegyzendő dolgok, egy-két reggeli gondolat és egy kérdés.",
+          "reflection_time": "Legjobb a hajnali órákban.",
+          "drive_spot": "A behajtót mutató kameraterület (a Területek fülön rajzold meg).",
+          "drive_camera": "Csak akkor kell, ha több kamerának is van ilyen nevű területe.",
+          "drive_triggers": "A behajtót figyelő mozgás- vagy autóérzékelők. Üresen: a kamera saját mozgás- és autóérzékelői.",
+          "full_volume_speakers": "Ezeken a bemondások 100%-on szólnak, utána visszaáll a hangerő – a minden másra lehalkított tabletekhez. Csendes órákban nem (akkor az éjszakai hangerő érvényes).",
+          "tts_entity": "A hangszórók lehetnek Assist hangszórók vagy médialejátszók. Az Echókhoz az Alexa Media Playeren keresztül szól; minden más médialejátszó (okoshangszóró, Cast eszköz) ezt a szövegfelolvasó hangot használja.",
+          "speakers": "Assist hangszórók vagy médialejátszók (Echók az Alexa Media Playeren keresztül).",
+          "media_speakers": "Kikapcsolva csak a hangasszisztens-hangszórók szólnak, akkor is, ha egy ébresztő vagy bemondás Echót nevez meg (ilyenkor oda megy, ahol emberek vannak). Van hozzá 'Echo hangszórók' kapcsoló is automatizálásokhoz és dashboardokhoz.",
+          "media_important_only": "Bekapcsolva az Echók csak ébresztőket, emlékeztetőket és biztonsági riasztásokat mondanak; a bemondások, értesítések és a csevegés a hangasszisztens-hangszórókra megy. Van hozzá 'Echók: csak ébresztők és emlékeztetők' kapcsoló is.",
+          "foresight": "Esténként egy AI-pillantás a holnapi naptárakra, időjárásra, ébresztőkre és emlékeztetőkre. Csak akkor szól, ha még ma este tenni kell valamit – fagy egy korai indulás előtt, eső a mosás napján. Általában csendben marad.",
+          "foresight_time": "A csendes órák kezdete előtt.",
+          "sleep_detection": "Alszik egy lefekvési rutin után, vagy csendes órákban, ha bent egy ideje semmi sem mozdult. Ébren van reggel, ha két szobában mozgás van (vagy valaki kézzel felkapcsol egy lámpát). A Ház érzékelő mutatja.",
+          "bedtime_routines": "Rutinok, amelyek azt jelentik, hogy mindenki lefeküdt, vesszővel elválasztva. Üresen: minden rutin, amelynek a nevében 'night', 'bed', 'éjszaka', 'éjt', 'alvás' vagy 'lefekvés' szerepel.",
+          "sleep_actions": "pl. tablet képernyők ki, az Echo hangszórók kapcsoló ki.",
+          "wake_actions": "pl. az Echo hangszórók vissza, az előszobai lámpa halványan.",
+          "appliances": "Mosógép, szárító, mosogatógép, porszívó – a teljesítménymérőjük vagy állapotuk. Üresen minden robotporszívót és minden mosógép, szárító vagy mosogatógép nevű teljesítménymérőt követ.",
+          "appliance_announce": "Ott, ahol emberek vannak, bemondja, hogy „végzett a mosógép”, és azt is, ha valamelyik a szokottnál sokkal tovább tart. Egyszerű szavakkal, AI nélkül.",
+          "appliance_watts": "Teljesítménymérőknél: e fölött működik, és akkor végzett, ha öt percig e alatt maradt.",
+          "voice_agent": "A normál esetben válaszoló AI asszisztens (pl. Google AI). Üresen az oldal csevegő-asszisztensét használja.",
+          "backup_agent": "Akkor válaszol, ha a fő asszisztens hibázik — a Home Assistant saját asszisztense AI nélkül is kezeli a lámpákat, a fűtést és az időzítőket.",
+          "animal_sensors": "Ketrec, kutyaház, ól vagy terrárium hőmérséklet-érzékelői.",
+          "away_lights_on": "Ha sötétedés után mindenki elment, a lámpák úgy működnek, mint egy héttel korábban ugyanekkor (a Home Assistant előzményei alapján), pár perc eltéréssel. Nem indul el (vagy leáll), ha valaki otthon van, vagy nemrég mozgás volt bent – a telefon nélküli emberek miatt –, és visszaállítja, amit bekapcsolt. Van hozzá 'Távolléti világítás' kapcsoló is.",
+          "away_people": "Üresen: mindenki, akinek van személy-bejegyzése.",
+          "away_lights": "Üresen: minden szobában lévő lámpa, kivéve a kijelzőket, LED-gyűrűket, háttérvilágításokat és csoportokat. Csak azok a lámpák kapcsolnak, amelyek egy héttel korábban ilyenkor égtek.",
+          "away_after": "Hogy egy gyors bolti út ne indítsa el.",
+          "animal_low": "Egyszer szól, ha ez alá csökken (csendes órákban reggelig vár vele), és fagy előtt este figyelmeztet.",
+          "animal_high": "Egyszer szól, ha e fölé emelkedik.",
+          "screen": "Riasztások, értesítések és reggeli kártya a Sentient képernyő-kártyán (custom:sentient-screen-card). Kikapcsolva csak a ház áttekintését mutatja.",
+          "screen_actions": "pl. a tablet felébresztése és a képernyő-kártyás oldalra váltás.",
+          "screen_clear_actions": "pl. a tablet visszaváltása a szokásos oldalára."
         }
       },
       "memories": {
@@ -316,6 +414,28 @@
       },
       "speaker": {
         "name": "Beszélő"
+      },
+      "drive": {
+        "name": "Behajtó"
+      },
+      "mind": {
+        "name": "Gondolatok"
+      },
+      "house": {
+        "name": "Ház",
+        "state": {
+          "awake": "Ébren",
+          "asleep": "Alszik"
+        }
+      },
+      "screen": {
+        "name": "Képernyő",
+        "state": {
+          "idle": "Nyugalmi",
+          "morning": "Reggel",
+          "notice": "Értesítés",
+          "alert": "Riasztás"
+        }
       }
     },
     "switch": {
@@ -336,11 +456,28 @@
       },
       "party_mode": {
         "name": "Fényshow"
+      },
+      "media_speakers": {
+        "name": "Echo hangszórók"
+      },
+      "media_important_only": {
+        "name": "Echók: csak ébresztők és emlékeztetők"
+      },
+      "away_lights": {
+        "name": "Távolléti világítás"
+      },
+      "screen": {
+        "name": "Tablet képernyő"
       }
     },
     "stt": {
       "voice_stt": {
         "name": "Hangfelismerő beszédfelismerés"
+      }
+    },
+    "conversation": {
+      "voice": {
+        "name": "Tartalékkal"
       }
     }
   },
@@ -358,7 +495,8 @@
         "preference": "Preferencia",
         "person": "Személy",
         "routine": "Rutin",
-        "note": "Jegyzet"
+        "note": "Jegyzet",
+        "correction": "Javítás"
       }
     },
     "chattiness": {
@@ -661,6 +799,10 @@
         "speak": {
           "name": "Bemondás",
           "description": "Az eredmény bemondása ott, ahol emberek vannak."
+        },
+        "details": {
+          "name": "Részletek",
+          "description": "Részleteket váró rutinokhoz, pl. melyik szobák."
         }
       }
     },
@@ -715,6 +857,140 @@
           "description": "Pontosan ezek a lámpák."
         }
       }
+    },
+    "reflect": {
+      "name": "Átgondolás most",
+      "description": "Gondolja át most az elmúlt napot, mint éjszakánként: új emlékek, reggeli gondolatok és egy kérdés."
+    },
+    "check_drive": {
+      "name": "Behajtó ellenőrzése",
+      "description": "Egy AI-pillantás most a behajtó területre, és frissíti, mi parkol ott."
+    },
+    "wonder": {
+      "name": "Kíváncsiság",
+      "description": "Kérdés hozzáadása a kíváncsisághoz, egy elvetése, vagy a következő feltevése most.",
+      "fields": {
+        "question": {
+          "name": "Kérdés",
+          "description": "Valami, amit egyszer megkérdez a háztartástól."
+        },
+        "ask_now": {
+          "name": "Kérdezd most",
+          "description": "A következő kérdést azonnal felteszi."
+        },
+        "dismiss": {
+          "name": "Elvetés",
+          "description": "Szavak egy kérdésből, amit mégse kérdezzen meg."
+        }
+      }
+    },
+    "follow_up": {
+      "name": "Visszatérés",
+      "description": "Később visszatér valamire, és elmondja, hogyan sikerült.",
+      "fields": {
+        "minutes": {
+          "name": "Perc",
+          "description": "Mikor ellenőrizze."
+        },
+        "about": {
+          "name": "Miről",
+          "description": "Néhány szó arról, miről van szó."
+        },
+        "entity": {
+          "name": "Entitás",
+          "description": "Akkor ellenőrizendő eszköz."
+        },
+        "state": {
+          "name": "Állapot",
+          "description": "Az az állapot, amely azt jelenti, hogy sikerült."
+        },
+        "above": {
+          "name": "Legalább",
+          "description": "Sikerült, ha az érték legalább ennyi."
+        },
+        "below": {
+          "name": "Legfeljebb",
+          "description": "Sikerült, ha az érték legfeljebb ennyi."
+        },
+        "if_done": {
+          "name": "Ha sikerült",
+          "description": "Mit mondjon, ha sikerült."
+        },
+        "if_not": {
+          "name": "Ha nem",
+          "description": "Mit mondjon, ha nem sikerült."
+        },
+        "speaker": {
+          "name": "Hangszóró",
+          "description": "Hol mondja (alapból ott, ahol emberek vannak)."
+        }
+      }
+    },
+    "cancel_follow_up": {
+      "name": "Visszatérés törlése",
+      "description": "Ne térjen vissza valamire.",
+      "fields": {
+        "about": {
+          "name": "Miről",
+          "description": "Az azonosítója, vagy szavak abból, amiről szól."
+        }
+      }
+    },
+    "look_ahead": {
+      "name": "Előretekintés",
+      "description": "Most nézzen rá a holnapra, és mondja meg, van-e valami, amire érdemes figyelmeztetni.",
+      "fields": {
+        "speak": {
+          "name": "Mondja ki",
+          "description": "Ha van, mondja ki hangosan."
+        }
+      }
+    },
+    "set_asleep": {
+      "name": "Alvás beállítása",
+      "description": "Megmondja a háznak, hogy alszik vagy ébren van (lefuttatja a lefekvési vagy reggeli műveleteket).",
+      "fields": {
+        "asleep": {
+          "name": "Alszik",
+          "description": "Be: alszik, ki: ébren."
+        }
+      }
+    },
+    "show_on_screen": {
+      "name": "Megjelenítés a képernyőn",
+      "description": "Kártya kitétele a Sentient képernyő-kártyára.",
+      "fields": {
+        "message": {
+          "name": "Üzenet",
+          "description": "Mit mutasson."
+        },
+        "camera": {
+          "name": "Kamera",
+          "description": "Egy kamera, amit mellé mutat."
+        },
+        "minutes": {
+          "name": "Időtartam",
+          "description": "Meddig (üresen 10 perc)."
+        },
+        "alert": {
+          "name": "Riasztás",
+          "description": "Riasztásként mutassa."
+        }
+      }
+    },
+    "clear_screen": {
+      "name": "Képernyő törlése",
+      "description": "Egy kártya levétele a Sentient képernyő-kártyáról, vagy mindegyiké.",
+      "fields": {
+        "card_id": {
+          "name": "Kártya",
+          "description": "A kártya azonosítója, 'morning', vagy üresen mind."
+        }
+      }
+    },
+    "morning_card": {
+      "name": "Reggeli kártya",
+      "description": "A mai reggeli kártya kitétele most a Sentient képernyőre."
     }
   }
 }

@@ -35,7 +35,7 @@ from .presence import area_of
 STORAGE_VERSION = 1
 KEEP = 400
 EVENT_TIMELINE = f"{DOMAIN}_timeline"
-KINDS = ["said", "held", "noticed", "visitor", "watch", "light", "health", "mode", "digest", "critical", "energy", "security"]
+KINDS = ["said", "held", "noticed", "visitor", "watch", "light", "health", "mode", "digest", "critical", "energy", "security", "mind", "loop", "drive", "appliance", "animal", "voice"]
 
 
 class Timeline:
@@ -149,7 +149,9 @@ class Timeline:
     @callback
     def _mode(self, event: Event) -> None:
         d = event.data
-        if "chime" in d:
+        if "media_speakers" in d:
+            self.add("mode", t("timeline.echos_on" if d["media_speakers"] else "timeline.echos_off"))
+        elif "chime" in d:
             self.add("mode", t("timeline.chime_on" if d["chime"] else "timeline.chime_off"))
         elif "guest_mode" in d:
             self.add("mode", t("timeline.guest_on" if d["guest_mode"] else "timeline.guest_off"))
@@ -174,8 +176,15 @@ class Timeline:
                 self.add("health", line)
         for key, line in before.items():
             if key not in now:
-                name = key.split(":", 1)[1]
-                self.add("health", t("timeline.back_online" if key.startswith("offline") else "timeline.battery_ok", name=name))
+                kind, name = key.split(":", 1)
+                back = {
+                    "offline": t("timeline.back_online", name=name), "battery": t("timeline.battery_ok", name=name),
+                    "ai": t("timeline.ai_back"), "speaker": t("timeline.speaker_back", name=name),
+                    "stuck": t("timeline.sensor_back", name=name), "limit": None, "wear": None, "fight": None,
+                    "frozen": t("timeline.camera_back", name=name.removesuffix(" frozen")),
+                }.get(kind, t("timeline.fine_again", name=name))
+                if back:
+                    self.add("health", back)
 
     def _starting(self, _event: Event) -> bool:
         return dt_util.utcnow() - self._started < timedelta(minutes=12)

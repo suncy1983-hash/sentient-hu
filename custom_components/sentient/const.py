@@ -46,6 +46,9 @@ DEFAULT_NOTIFY_WHEN = ["critical", "security", "urgent", "unheard", "visitors"]
 CONF_CAMERA_COOLDOWN = "camera_cooldown"
 CONF_FALLBACK_SPEAKERS = "fallback_speakers"
 CONF_DAILY_AI_LIMIT = "daily_ai_limit"
+CONF_APPLIANCES = "appliances"
+CONF_APPLIANCE_ANNOUNCE = "appliance_announce"
+CONF_APPLIANCE_WATTS = "appliance_watts"
 CONF_NOTICE_ENTITIES = "notice_entities"
 CONF_CHATTINESS = "chattiness"
 CONF_HOUSE_RULES = "house_rules"
@@ -79,7 +82,8 @@ DEFAULT_BANNED_WORDS = "sir, madam"
 DEFAULT_SUPPRESS_SECONDS = 60
 DEFAULT_PROMPT_MEMORIES = 25
 DEFAULT_ALL_OCCUPIED = True
-DEFAULT_DAILY_AI_LIMIT = 100  # background camera checks per day
+DEFAULT_DAILY_AI_LIMIT = 100  # background AI calls per day (0 = no limit)
+DEFAULT_APPLIANCE_WATTS = 5
 DEFAULT_CHATTINESS = "quiet"
 DEFAULT_SUGGEST_ROUTINES = True
 DEFAULT_ANNOUNCE_VISITORS = False
@@ -111,6 +115,22 @@ FRONTEND_URL = "/sentient_frontend"
 PANEL_URL_PATH = "sentient"
 CONF_SIDEBAR = "sidebar_panel"
 CONF_CHAT_AGENT = "chat_agent"
+CONF_VOICE_AGENT = "voice_agent"
+CONF_BACKUP_AGENT = "backup_agent"
+DEFAULT_BACKUP_AGENT = "conversation.home_assistant"
+CONF_ANIMAL_SENSORS = "animal_sensors"
+CONF_AWAY_LIGHTS_ON = "away_lights_on"
+CONF_AWAY_PEOPLE = "away_people"
+CONF_AWAY_LIGHTS = "away_lights"
+CONF_AWAY_AFTER = "away_after"
+DEFAULT_AWAY_AFTER = 30
+CONF_SCREEN = "screen"
+CONF_SCREEN_ACTIONS = "screen_actions"
+CONF_SCREEN_CLEAR_ACTIONS = "screen_clear_actions"
+CONF_ANIMAL_LOW = "animal_low"
+CONF_ANIMAL_HIGH = "animal_high"
+DEFAULT_ANIMAL_LOW = 3
+DEFAULT_ANIMAL_HIGH = 27
 CONF_BATTERY_THRESHOLD = "battery_threshold"
 CONF_HEALTH_IGNORE = "health_ignore"
 DEFAULT_BATTERY_THRESHOLD = 20
@@ -130,7 +150,7 @@ EVENT_MODE_CHANGED = f"{DOMAIN}_mode_changed"
 EVENT_SPEAKER = f"{DOMAIN}_speaker"
 
 # Memory
-MEMORY_CATEGORIES = ["fact", "preference", "person", "routine", "note"]
+MEMORY_CATEGORIES = ["fact", "preference", "person", "routine", "note", "correction"]
 MEMORY_STORAGE_VERSION = 1
 MEMORY_MAX_ITEMS = 500
 
@@ -196,3 +216,35 @@ CONF_PARTY_SOUND = "party_sound"
 CONF_PARTY_SOUND_SWITCH = "party_sound_switch"
 CONF_PARTY_SHOW = "party_show"
 DEFAULT_PARTY_SHOW = ["disco"]
+
+# Room-aware volume, messages that follow people, the drive
+CONF_ROOM_VOLUME = "room_volume"
+CONF_FOLLOW_YOU = "follow_you"
+CONF_FOLLOW_MINUTES = "follow_minutes"
+DEFAULT_FOLLOW_MINUTES = 60
+CONF_DRIVE_CAMERA = "drive_camera"
+CONF_DRIVE_SPOT = "drive_spot"
+CONF_DRIVE_TRIGGERS = "drive_triggers"
+DEFAULT_DRIVE_SPOT = "drive"
+
+# The mind: conversations, follow-ups, curiosity, overnight reflection
+CONF_CONVERSATIONS = "conversation_memory"
+CONF_FOLLOW_UPS = "follow_ups"
+CONF_CURIOSITY = "curiosity"
+CONF_REFLECTION = "reflection"
+CONF_REFLECTION_TIME = "reflection_time"
+DEFAULT_REFLECTION_TIME = "04:30:00"
+EVENT_WATCH_EXPIRED = f"{DOMAIN}_watch_expired"
+CONF_FULL_VOLUME_SPEAKERS = "full_volume_speakers"
+CONF_TTS_ENTITY = "tts_entity"
+CONF_MEDIA_SPEAKERS = "media_speakers"
+CONF_MEDIA_IMPORTANT_ONLY = "media_important_only"  # Echos: alarms, reminders and safety alerts only
+CONF_FORESIGHT = "foresight"
+CONF_FORESIGHT_TIME = "foresight_time"
+DEFAULT_FORESIGHT_TIME = "19:30:00"
+CONF_SLEEP = "sleep_detection"
+CONF_SLEEP_MINUTES = "sleep_minutes"
+DEFAULT_SLEEP_MINUTES = 20
+CONF_BEDTIME_ROUTINES = "bedtime_routines"
+CONF_SLEEP_ACTIONS = "sleep_actions"
+CONF_WAKE_ACTIONS = "wake_actions"

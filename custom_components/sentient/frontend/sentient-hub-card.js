@@ -1,17 +1,20 @@
 /* Sentient hub card — the house's voice at a glance, for a main dashboard. Ships with Sentient;
    add it as `type: custom:sentient-hub-card`. No name is shown anywhere.
 
-   What it shows: a core that lights up while a speaker listens, thinks or talks (tap it to open
-   Sentient's page); the last thing said; the voice speakers; quick buttons (briefing, hush, guests and
+   What it shows: a big talk button that lights up while a speaker listens, thinks or talks; the last thing said; the voice speakers; quick buttons (briefing, hush, guests and
    the light shows chosen in Sentient's settings); what's coming up next; today's numbers; a short
    feed; and, if set, the server's vitals.
 
    Options (all optional):
      height: 688            fixed height in px (otherwise it sizes to fit)
-     feed_rows: 4           how many feed lines
+     feed_rows: 4           most feed lines (with a fixed height it shows as many whole lines as fit, up to this)
      nodes:                 the voice speakers to show (default: every assist_satellite)
        - entity: assist_satellite.kitchen_speaker_assist_satellite
          name: Kitchen
+     talk_script: script.x  what the big button runs (default: Home Assistant's voice assistant, listening)
+     house:                 optional row of other facts, if wanted
+       - entity: sensor.x
+         name: Something
      system: {cpu: sensor.x, memory: sensor.y, memory_total_mb: 16384, disk: sensor.z, nvr: sensor.w,
               temperature: sensor.t, boot: sensor.b}
 */
@@ -22,15 +25,20 @@
   // labels follow Home Assistant's language: Hungarian when it is set to Hungarian, English otherwise
   const HU = {
     DISCO: "DISZKÓ", PARTY: "BULI", RAINBOW: "SZIVÁRVÁNY", CHILL: "CHILL", HALLOWEEN: "HALLOWEEN", XMAS: "KARÁCSONY",
-    "STANDING BY": "KÉSZENLÉTBEN", LISTENING: "FIGYEL", THINKING: "GONDOLKODIK", SPEAKING: "BESZÉL",
+    "STANDING BY": "KÉSZENLÉTBEN", "HOUSE ASLEEP": "A HÁZ ALSZIK", LISTENING: "FIGYEL", THINKING: "GONDOLKODIK", SPEAKING: "BESZÉL",
+    "TAP TO TALK": "KOPPINTS ÉS BESZÉLJ", "Tap to talk": "Koppints és beszélj",
     PREPARING: "KÉSZÜL…", BRIEFING: "ÖSSZEFOGLALÓ", HUSHED: "NÉMÍTVA", HUSH: "NÉMÍTÁS", "GUESTS IN": "VENDÉGEK ITT", GUESTS: "VENDÉGEK",
-    "AT THE DOOR": "AZ AJTÓNÁL", SPOKEN: "ELHANGZOTT", WATCHING: "FIGYELÉS", PROBLEMS: "HIBA", HEALTH: "ÁLLAPOT", OK: "OK",
+    "AT THE DOOR": "AZ AJTÓNÁL", DOOR: "AJTÓ", SPOKEN: "ELHANGZOTT", WATCHING: "FIGYELÉS", MEMORY: "EMLÉK", ROUTINES: "RUTINOK",
+    DRIVE: "BEHAJTÓ", PROBLEMS: "HIBA", HEALTH: "ÁLLAPOT", OK: "OK",
+    THOUGHT: "GONDOLAT", WONDERING: "KÍVÁNCSI", CHECKING: "ELLENŐRZI",
+    "LIGHTS ON": "ÉGŐ LÁMPA", "ALL SHUT": "MIND ZÁRVA", OPEN: "NYITVA", "DOORS & WINDOWS": "AJTÓK ÉS ABLAKOK",
+    INSIDE: "BENT", OUTSIDE: "KINT", SET: "BEÁLLÍTVA",
     "Nothing yet today": "Ma még semmi", "Nothing said yet": "Még nem szólt semmit", "UP NEXT": "KÖVETKEZŐ",
     FEED: "ESEMÉNYEK", ALL: "MIND", OFF: "KI", MEM: "MEM", DSK: "LEMEZ", Open: "Megnyitás",
   };
   let lang = "en";
   const L = (t) => (lang === "hu" && HU[t] != null ? HU[t] : t);
-  const KEYS = ["last_spoken", "likely_room", "watches", "visitors", "health", "hush", "guest_mode", "party_mode"];
+  const KEYS = ["last_spoken", "likely_room", "watches", "visitors", "health", "hush", "guest_mode", "party_mode", "memories", "routines", "drive", "mind", "house"];
   const SHOWS = {
     disco: ["mdi:party-popper", "DISCO"], party: ["mdi:glass-cocktail", "PARTY"], rainbow: ["mdi:looks", "RAINBOW"],
     chill: ["mdi:weather-night", "CHILL"], halloween: ["mdi:halloween", "HALLOWEEN"], christmas: ["mdi:pine-tree", "XMAS"],
@@ -40,13 +48,14 @@
     security: ["mdi:shield-alert-outline", "#ff6b80"], health: ["mdi:heart-pulse", "#ffbe55"],
     visitor: ["mdi:doorbell-video", "#b48cff"], mode: ["mdi:tune-variant", "#00fff7"], watch: ["mdi:cctv", "#b48cff"],
     heating: ["mdi:radiator", "#ffb070"], learned: ["mdi:school-outline", "#3dffa8"],
+    mind: ["mdi:head-lightbulb-outline", "#ff9de2"], loop: ["mdi:sync", "#3dffa8"], drive: ["mdi:car", "#7fdcff"],
   };
   const LIVE = { listening: "listen", processing: "think", responding: "speak" };
 
   class SentientHubCard extends HTMLElement {
     setConfig(c) {
       this._cfg = c || {};
-      this._rows = parseInt(this._cfg.feed_rows, 10) || 4;
+      this._rows = parseInt(this._cfg.feed_rows, 10) || (parseInt(this._cfg.height, 10) ? 12 : 4);
       this._sig = null;
     }
     static getStubConfig() { return {}; }
@@ -67,7 +76,8 @@
       const spoke = ids.last_spoken && h.states[ids.last_spoken];
       if (spoke && spoke.last_updated !== this._spokeSig) { this._spokeSig = spoke.last_updated; if (!first) this._fetch(); }
       const sig = [...KEYS.map((k) => (ids[k] && h.states[ids[k]] ? h.states[ids[k]].last_updated : "")),
-        ...this._nodes().map((n) => (h.states[n.entity] || {}).state), ...Object.values(this._sys()).map((e) => (h.states[e] || {}).state)].join("|");
+        ...this._nodes().map((n) => (h.states[n.entity] || {}).state), ...Object.values(this._sys()).map((e) => (h.states[e] || {}).state),
+        JSON.stringify(this._glance().map((g) => g.val))].join("|");
       if (sig !== this._sig) { this._sig = sig; this._draw(); }
     }
 
@@ -115,6 +125,46 @@
       return out;
     }
 
+    _glance() {
+      // counting across every entity is cheap but not free: at most every 5 seconds
+      if (this._gl && Date.now() - this._gl.at < 5000) return this._gl.v;
+      this._gl = { at: Date.now(), v: this._glanceNow() };
+      return this._gl.v;
+    }
+
+    _glanceNow() {
+      const S = this._hass.states, cfg = this._cfg.house;
+      if (Array.isArray(cfg)) {
+        return cfg.map((x) => {
+          const st = S[x.entity];
+          const unit = st && st.attributes.unit_of_measurement ? st.attributes.unit_of_measurement : "";
+          return { icon: x.icon || (st && st.attributes.icon) || "mdi:information-outline", val: st ? st.state + unit : "–", label: String(x.name || (st && st.attributes.friendly_name) || x.entity).toUpperCase(), more: x.entity };
+        });
+      }
+      if (!Array.isArray(cfg)) return [];  // only when asked for: this card is about the assistant
+      const reg = this._hass.entities || {};
+      const real = (e) => !(reg[e] && (reg[e].hidden || reg[e].entity_category));
+      const lights = Object.values(S).filter((s) => s.entity_id.startsWith("light.") && s.state === "on" && real(s.entity_id)
+        && !Array.isArray(s.attributes.entity_id));
+      const OPENING = ["door", "window", "garage_door", "opening"];
+      const open = Object.values(S).filter((s) => s.entity_id.startsWith("binary_sensor.") && s.state === "on" && OPENING.includes(s.attributes.device_class));
+      const climate = Object.values(S).find((s) => s.entity_id.startsWith("climate.") && s.attributes.current_temperature != null);
+      const weather = Object.values(S).find((s) => s.entity_id.startsWith("weather.") && s.attributes.temperature != null);
+      const out = [
+        { icon: "mdi:lightbulb-group", val: lights.length, label: L("LIGHTS ON"), cls: lights.length ? "on" : "" },
+        { icon: open.length ? "mdi:door-open" : "mdi:door-closed-lock", val: open.length ? open.length : L("ALL SHUT"), label: open.length ? L("OPEN") : L("DOORS & WINDOWS"),
+          cls: open.length ? "warn" : "ok", more: open.length === 1 ? open[0].entity_id : null },
+      ];
+      if (climate) {
+        const tgt = climate.attributes.temperature;
+        out.push({ icon: climate.attributes.hvac_action === "heating" ? "mdi:fire" : "mdi:home-thermometer-outline",
+          val: `${Math.round(climate.attributes.current_temperature * 10) / 10}°`, label: tgt != null ? `${L("INSIDE")} · ${L("SET")} ${tgt}°` : L("INSIDE"),
+          cls: climate.attributes.hvac_action === "heating" ? "heat" : "", more: climate.entity_id });
+      }
+      if (weather) out.push({ icon: "mdi:weather-partly-cloudy", val: `${Math.round(weather.attributes.temperature)}°`, label: L("OUTSIDE"), more: weather.entity_id });
+      return out;
+    }
+
     async _fetch() {
       if (!this._hass) return;
       try {
@@ -158,7 +208,8 @@
       const states = nodes.map((n) => (S[n.entity] || {}).state);
       const live = states.map((s) => LIVE[s]).find(Boolean);
       const mode = live || "idle";
-      const label = L({ idle: "STANDING BY", listen: "LISTENING", think: "THINKING", speak: "SPEAKING" }[mode]);
+      const asleep = (this._st("house") || {}).state === "asleep";
+      const label = L({ idle: asleep ? "HOUSE ASLEEP" : "STANDING BY", listen: "LISTENING", think: "THINKING", speak: "SPEAKING" }[mode]);
       const said = this._st("last_spoken");
       const saidText = said && !["unknown", "unavailable", ""].includes(said.state) ? said.state : "";
       const room = String((this._st("likely_room") || {}).state || "").toLowerCase();
@@ -194,10 +245,23 @@
       const vis = this._st("visitors"), w = this._st("watches"), hl = this._st("health");
       const problems = hl ? parseInt(hl.state, 10) || 0 : 0;
       const tile = (icon, val, lbl, cls, more) => `<div class="tile ${cls || ""}"${more ? ` data-act="more" data-id="${esc(more)}"` : ""}><ha-icon icon="${icon}"></ha-icon><b>${esc(L(String(val)))}</b><span>${L(lbl)}</span></div>`;
-      const tiles = tile("mdi:doorbell-video", vis ? vis.state : "–", "AT THE DOOR", "", vis && vis.entity_id)
-        + tile("mdi:message-text-outline", saidCount, "SPOKEN", "")
+      const memS = this._st("memories"), rou = this._st("routines"), dr = this._st("drive"), mind = this._st("mind");
+      // a thought from overnight (this morning only), else what it's wondering about
+      const ma = (mind && mind.attributes) || {};
+      const fresh = ma.last_reflection && Date.now() - new Date(ma.last_reflection) < 16 * 3600e3;
+      const thought = fresh && (ma.thoughts || []).length ? ["THOUGHT", ma.thoughts[0]]
+        : (ma.wondering || []).length ? ["WONDERING", ma.wondering[0]] : (ma.follow_ups || []).length
+        ? ["CHECKING", `${ma.follow_ups[0].about} · ${ma.follow_ups[0].at}`] : null;
+      const tiles = tile("mdi:message-text-outline", saidCount, "SPOKEN", "")
+        + tile("mdi:doorbell-video", vis ? vis.state : "–", "DOOR", "", vis && vis.entity_id)
         + tile("mdi:radar", w ? w.state : "0", "WATCHING", w && +w.state ? "on" : "", w && w.entity_id)
+        + tile("mdi:brain", memS ? memS.state : "–", "MEMORY", "", memS && memS.entity_id)
+        + tile("mdi:calendar-sync-outline", rou ? rou.state : "–", "ROUTINES", "", rou && rou.entity_id)
+        + (dr && dr.attributes.set_up ? tile("mdi:car", dr.state === "unknown" ? "–" : dr.state, "DRIVE", +dr.state ? "on" : "", dr.entity_id) : "")
         + tile(problems ? "mdi:alert-outline" : "mdi:shield-check-outline", problems ? problems : "OK", problems ? "PROBLEMS" : "HEALTH", problems ? "warn" : "ok", hl && hl.entity_id);
+
+      // the house right now: counted from the house's own entities (or the ones in `house:`)
+      const glance = this._glance();
 
       // feed: the latest few, one line each
       const feed = (this._items || []).filter((i) => FEED[i.kind] && !(i.kind === "noticed" && /decided it wasn't worth|nem tartotta érdemesnek/.test(i.detail || "")))
@@ -231,8 +295,9 @@
           <div class="top"><span>${up}</span><span class="dots">${nodes.map((_, i) => `<i class="${LIVE[states[i]] || (states[i] === "unavailable" ? "off" : "")}"></i>`).join("")}</span>
             <span class="${temp >= 75 ? "hot" : temp >= 60 ? "warm" : ""}">${temp != null ? Math.round(temp) + "°C" : ""}</span></div>
           <div class="mid">
-            <button class="orb ${mode}" data-act="open" title="${L("Open")}"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
+            <div class="talk"><button class="orb ${mode}" data-act="talk" title="${L("Tap to talk")}"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
               <span class="nuc"><ha-icon icon="${mode === "speak" ? "mdi:waveform" : mode === "think" ? "mdi:dots-horizontal" : "mdi:microphone"}"></ha-icon></span></button>
+              <span class="tl">${mode === "idle" ? L("TAP TO TALK") : label}</span></div>
             <div class="info"><div class="st">${label}</div>
               <div class="said">${saidText ? "“" + esc(saidText) + "”" : `<i>${L("Nothing said yet")}</i>`}</div>
               ${said && saidText ? `<div class="when">${hm(new Date(said.last_changed))}</div>` : ""}</div>
@@ -240,11 +305,19 @@
           <div class="nodes">${nodeHtml}</div>
           <div class="quick">${quick}</div>
           ${next ? `<div class="next"><ha-icon icon="${next.icon}"></ha-icon><span class="nl">${L("UP NEXT")}</span><span class="nt">${esc(next.text)}</span><em>${next.t.toDateString() === new Date().toDateString() ? hm(next.t) : next.t.toLocaleDateString(lang === "hu" ? "hu-HU" : "en-GB", { weekday: "short" }).toUpperCase() + " " + hm(next.t)}</em></div>` : ""}
+          ${thought ? `<div class="next mind"><ha-icon icon="mdi:head-lightbulb-outline"></ha-icon><span class="nl">${L(thought[0])}</span><span class="nt">${esc(thought[1])}</span></div>` : ""}
           <div class="tiles">${tiles}</div>
+          ${glance.length ? `<div class="glance">${glance.map((g) => `<div class="gl${g.cls ? " " + g.cls : ""}"${g.more ? ` data-act="more" data-id="${esc(g.more)}"` : ""}><ha-icon icon="${g.icon}"></ha-icon><div><b>${esc(g.val)}</b><span>${g.label}</span></div></div>`).join("")}</div>` : ""}
           <div class="fh"><span>${L("FEED")}</span><i></i><button class="more" data-act="feed">${L("ALL")}</button></div>
           <div class="feed">${feed}</div>
           ${bars.length ? `<div class="sys">${bars.join("")}</div>` : ""}
         </ha-card>`;
+      // with a fixed height the feed fills the space left: drop whole lines that don't fit
+      if (fixed) requestAnimationFrame(() => {
+        const fd = this.shadowRoot.querySelector(".feed");
+        if (!fd) return;
+        for (let i = 0; i < 20 && fd.scrollHeight > fd.clientHeight + 1 && fd.children.length > 1; i++) fd.lastElementChild.remove();
+      });
     }
 
     _click(e) {
@@ -252,7 +325,11 @@
       if (!el) return;
       const act = el.dataset.act, id = el.dataset.id, h = this._hass;
       const go = (path) => { history.pushState(null, "", path); window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } })); };
-      if (act === "open") go("/sentient");
+      if (act === "talk") {
+        if (this._cfg.talk_script) h.callService("script", "turn_on", { entity_id: this._cfg.talk_script });
+        else this.dispatchEvent(new CustomEvent("hass-action", { bubbles: true, composed: true,
+          detail: { config: { tap_action: { action: "assist", start_listening: true } }, action: "tap" } }));
+      } else if (act === "open") go("/sentient");
       else if (act === "feed") go("/sentient/timeline");
       else if (act === "toggle") h.callService("switch", "toggle", { entity_id: id });
       else if (act === "more") this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true }));
@@ -279,20 +356,23 @@
   .top .warm{color:#ffbe55} .top .hot{color:#ff6b80}
   .dots{display:flex;gap:5px} .dots i{width:6px;height:6px;border-radius:50%;background:rgba(0,255,247,.35)}
   .dots i.off{background:rgba(255,107,128,.6)} .dots i.listen,.dots i.speak,.dots i.think{background:#00fff7;box-shadow:0 0 8px #00fff7}
-  .mid{display:flex;align-items:center;gap:16px;z-index:1}
-  .orb{all:unset;cursor:pointer;position:relative;width:104px;height:104px;flex:none;display:grid;place-items:center;-webkit-tap-highlight-color:transparent}
+  .mid{display:flex;align-items:center;gap:20px;z-index:1}
+  .talk{display:flex;flex-direction:column;align-items:center;gap:8px;flex:none}
+  .tl{font-size:9.5px;font-weight:800;letter-spacing:.24em;color:rgba(150,235,245,.75)}
+  .orb{all:unset;cursor:pointer;position:relative;width:168px;height:168px;flex:none;display:grid;place-items:center;-webkit-tap-highlight-color:transparent}
+  .orb:active .nuc{transform:scale(.94)}
   .ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(0,255,247,.35)}
-  .r2{inset:12px;border-style:dashed;border-color:rgba(0,255,247,.25);animation:spin 30s linear infinite}
-  .r3{inset:24px;border-color:rgba(0,255,247,.55);box-shadow:0 0 18px rgba(0,255,247,.25)}
+  .r2{inset:18px;border-style:dashed;border-color:rgba(0,255,247,.25);animation:spin 30s linear infinite}
+  .r3{inset:38px;border-color:rgba(0,255,247,.55);box-shadow:0 0 18px rgba(0,255,247,.25)}
   .r1{border-top-color:#00fff7;animation:spin 8s linear infinite;filter:drop-shadow(0 0 5px #00fff7)}
-  .nuc{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 35%,rgba(0,255,247,.45),rgba(0,60,80,.6));
-    box-shadow:0 0 18px rgba(0,255,247,.45);animation:breathe 4s ease-in-out infinite} .nuc ha-icon{--mdc-icon-size:22px;color:#e9ffff}
+  .nuc{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 35%,rgba(0,255,247,.45),rgba(0,60,80,.6));
+    box-shadow:0 0 18px rgba(0,255,247,.45);animation:breathe 4s ease-in-out infinite} .nuc ha-icon{--mdc-icon-size:36px;color:#e9ffff}
   .orb.listen .r1{animation-duration:1.4s} .orb.listen .nuc{animation-duration:1s}
   .orb.think .r1{animation-duration:.7s;border-top-color:#c77dff;filter:drop-shadow(0 0 6px #c77dff)} .orb.think .nuc{background:radial-gradient(circle at 35% 35%,rgba(199,125,255,.55),rgba(50,20,80,.6));box-shadow:0 0 20px rgba(199,125,255,.5)}
   .orb.speak .r3{animation:pulse 1s ease-in-out infinite}
   @keyframes spin{to{transform:rotate(360deg)}} @keyframes breathe{50%{transform:scale(1.07);opacity:.85}} @keyframes pulse{50%{transform:scale(1.08);box-shadow:0 0 28px rgba(0,255,247,.55)}}
   .info{min-width:0;flex:1} .st{font-size:12px;font-weight:800;letter-spacing:.28em;color:#00fff7;text-shadow:0 0 8px rgba(0,255,247,.6);margin-bottom:6px}
-  .said{font-size:13.5px;line-height:1.35;color:#e6f7ff;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden} .said i{color:rgba(150,210,225,.55)}
+  .said{font-size:15px;line-height:1.35;color:#e6f7ff;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden} .said i{color:rgba(150,210,225,.55)}
   .when{font-size:10px;letter-spacing:.14em;color:rgba(150,220,235,.55);margin-top:4px}
   .nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px;z-index:1}
   .node{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:11px;border:1px solid rgba(0,255,247,.16);background:rgba(0,255,247,.03);
@@ -311,11 +391,18 @@
   .next{display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:12px;background:rgba(180,140,255,.07);border:1px solid rgba(180,140,255,.3);z-index:1;min-width:0}
   .next ha-icon{--mdc-icon-size:17px;color:#b48cff;flex:none} .nl{font-size:9px;font-weight:800;letter-spacing:.2em;color:#b48cff;flex:none}
   .nt{flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .next em{font-style:normal;font-size:10.5px;font-weight:700;color:#d9c8ff;letter-spacing:.08em}
-  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;z-index:1}
-  .tile{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:12px;border:1px solid rgba(0,255,247,.16);background:rgba(0,255,247,.03);cursor:default}
-  .tile[data-act]{cursor:pointer} .tile ha-icon{--mdc-icon-size:16px;color:#5fd8e6} .tile b{font-size:18px;font-weight:700;color:#e9ffff;line-height:1.1}
-  .tile span{font-size:8.5px;font-weight:800;letter-spacing:.14em;color:rgba(150,220,235,.6)}
+  .next.mind{background:rgba(255,157,226,.06);border-color:rgba(255,157,226,.3)} .next.mind ha-icon,.next.mind .nl{color:#ff9de2}
+  .tiles{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:5px;z-index:1}
+  .tile{display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px;border-radius:10px;border:1px solid rgba(0,255,247,.14);background:rgba(0,255,247,.025);cursor:default;min-width:0}
+  .tile[data-act]{cursor:pointer} .tile ha-icon{--mdc-icon-size:13px;color:#5fd8e6} .tile b{font-size:13px;font-weight:700;color:#e9ffff;line-height:1.1}
+  .tile span{font-size:7.5px;font-weight:800;letter-spacing:.1em;color:rgba(150,220,235,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .tile.on{border-color:rgba(0,255,247,.45)} .tile.ok ha-icon{color:#3dffa8} .tile.warn{border-color:rgba(255,190,85,.5)} .tile.warn ha-icon,.tile.warn b{color:#ffbe55}
+  .glance{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;z-index:1}
+  .gl{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;border:1px solid rgba(0,255,247,.14);background:rgba(0,255,247,.025);min-width:0}
+  .gl[data-act]{cursor:pointer} .gl ha-icon{--mdc-icon-size:19px;color:#5fd8e6;flex:none} .gl div{display:flex;flex-direction:column;min-width:0}
+  .gl b{font-size:15px;font-weight:700;color:#e9ffff;line-height:1.1;white-space:nowrap} .gl span{font-size:8px;font-weight:800;letter-spacing:.12em;color:rgba(150,220,235,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gl.on ha-icon{color:#ffd76a} .gl.ok ha-icon{color:#3dffa8} .gl.ok b{font-size:11px;letter-spacing:.1em} .gl.warn{border-color:rgba(255,190,85,.45)} .gl.warn ha-icon,.gl.warn b{color:#ffbe55}
+  .gl.heat ha-icon{color:#ff9a3d}
   .fh{display:flex;align-items:center;gap:8px;font-size:9.5px;font-weight:800;letter-spacing:.24em;color:#00fff7;z-index:1} .fh i{flex:1;height:1px;background:linear-gradient(90deg,rgba(0,255,247,.4),transparent)}
   .more{all:unset;cursor:pointer;font-size:9px;letter-spacing:.16em;color:rgba(150,220,235,.7);padding:2px 8px;border:1px solid rgba(0,255,247,.2);border-radius:8px}
   .feed{display:flex;flex-direction:column;gap:4px;z-index:1;min-height:0;overflow:hidden;flex:1}

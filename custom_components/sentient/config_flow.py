@@ -51,6 +51,22 @@ from .const import (
     CONF_HEALTH_IGNORE,
     DEFAULT_BATTERY_THRESHOLD,
     CONF_CHAT_AGENT,
+    CONF_VOICE_AGENT,
+    CONF_BACKUP_AGENT,
+    DEFAULT_BACKUP_AGENT,
+    CONF_ANIMAL_SENSORS,
+    CONF_AWAY_LIGHTS_ON,
+    CONF_AWAY_PEOPLE,
+    CONF_AWAY_LIGHTS,
+    CONF_AWAY_AFTER,
+    DEFAULT_AWAY_AFTER,
+    CONF_SCREEN,
+    CONF_SCREEN_ACTIONS,
+    CONF_SCREEN_CLEAR_ACTIONS,
+    CONF_ANIMAL_LOW,
+    CONF_ANIMAL_HIGH,
+    DEFAULT_ANIMAL_LOW,
+    DEFAULT_ANIMAL_HIGH,
     CONF_SIDEBAR,
     DEFAULT_SIDEBAR,
     BRIEFING_SECTIONS,
@@ -80,6 +96,10 @@ from .const import (
     CONF_NOTICE_ENTITIES,
     DEFAULT_CHATTINESS,
     CONF_DAILY_AI_LIMIT,
+    CONF_APPLIANCES,
+    CONF_APPLIANCE_ANNOUNCE,
+    CONF_APPLIANCE_WATTS,
+    DEFAULT_APPLIANCE_WATTS,
     CONF_FALLBACK_SPEAKERS,
     DEFAULT_DAILY_AI_LIMIT,
     CONF_AI_TASK_ENTITY,
@@ -95,6 +115,33 @@ from .const import (
     CONF_SPEAK_VOLUME,
     CONF_NIGHT_VOLUME,
     CONF_DUCK_MEDIA,
+    CONF_ROOM_VOLUME,
+    CONF_FULL_VOLUME_SPEAKERS,
+    CONF_TTS_ENTITY,
+    CONF_MEDIA_SPEAKERS,
+    CONF_MEDIA_IMPORTANT_ONLY,
+    CONF_SLEEP,
+    CONF_SLEEP_MINUTES,
+    DEFAULT_SLEEP_MINUTES,
+    CONF_BEDTIME_ROUTINES,
+    CONF_SLEEP_ACTIONS,
+    CONF_WAKE_ACTIONS,
+    CONF_FORESIGHT,
+    CONF_FORESIGHT_TIME,
+    DEFAULT_FORESIGHT_TIME,
+    CONF_FOLLOW_YOU,
+    CONF_FOLLOW_MINUTES,
+    DEFAULT_FOLLOW_MINUTES,
+    CONF_DRIVE_CAMERA,
+    CONF_DRIVE_SPOT,
+    CONF_DRIVE_TRIGGERS,
+    DEFAULT_DRIVE_SPOT,
+    CONF_CONVERSATIONS,
+    CONF_FOLLOW_UPS,
+    CONF_CURIOSITY,
+    CONF_REFLECTION,
+    CONF_REFLECTION_TIME,
+    DEFAULT_REFLECTION_TIME,
     CONF_CRITICAL,
     CONF_ENERGY,
     CONF_LEFT_OPEN_MINUTES,
@@ -134,8 +181,8 @@ from .const import (
     MEMORY_CATEGORIES,
 )
 
-_SPEAKER = selector.EntitySelector(selector.EntitySelectorConfig(domain="assist_satellite", multiple=True))
-_ONE_SPEAKER = selector.EntitySelector(selector.EntitySelectorConfig(domain="assist_satellite"))
+_SPEAKER = selector.EntitySelector(selector.EntitySelectorConfig(domain=["assist_satellite", "media_player"], multiple=True))
+_ONE_SPEAKER = selector.EntitySelector(selector.EntitySelectorConfig(domain=["assist_satellite", "media_player"]))
 
 
 def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
@@ -149,6 +196,34 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Optional(CONF_DEFAULT_SPEAKER, **d(CONF_DEFAULT_SPEAKER)): _ONE_SPEAKER,
             vol.Optional(CONF_FALLBACK_SPEAKERS, **d(CONF_FALLBACK_SPEAKERS, [])): _SPEAKER,
             vol.Required(CONF_SIDEBAR, **d(CONF_SIDEBAR, DEFAULT_SIDEBAR)): selector.BooleanSelector(),
+            vol.Optional(CONF_VOICE_AGENT, **d(CONF_VOICE_AGENT)): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="conversation")
+            ),
+            vol.Optional(CONF_BACKUP_AGENT, **d(CONF_BACKUP_AGENT, DEFAULT_BACKUP_AGENT)): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="conversation")
+            ),
+            vol.Required(CONF_SCREEN, **d(CONF_SCREEN, True)): selector.BooleanSelector(),
+            vol.Optional(CONF_SCREEN_ACTIONS, **d(CONF_SCREEN_ACTIONS, [])): selector.ActionSelector(),
+            vol.Optional(CONF_SCREEN_CLEAR_ACTIONS, **d(CONF_SCREEN_CLEAR_ACTIONS, [])): selector.ActionSelector(),
+            vol.Optional(CONF_ANIMAL_SENSORS, **d(CONF_ANIMAL_SENSORS, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", device_class="temperature", multiple=True)
+            ),
+            vol.Required(CONF_ANIMAL_LOW, **d(CONF_ANIMAL_LOW, DEFAULT_ANIMAL_LOW)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=-10, max=20, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_ANIMAL_HIGH, **d(CONF_ANIMAL_HIGH, DEFAULT_ANIMAL_HIGH)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=15, max=45, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_AWAY_LIGHTS_ON, **d(CONF_AWAY_LIGHTS_ON, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_AWAY_PEOPLE, **d(CONF_AWAY_PEOPLE, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="person", multiple=True)
+            ),
+            vol.Optional(CONF_AWAY_LIGHTS, **d(CONF_AWAY_LIGHTS, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="light", multiple=True)
+            ),
+            vol.Required(CONF_AWAY_AFTER, **d(CONF_AWAY_AFTER, DEFAULT_AWAY_AFTER)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=240, step=5, unit_of_measurement="min", mode=selector.NumberSelectorMode.BOX)
+            ),
             vol.Optional(CONF_CHAT_AGENT, **d(CONF_CHAT_AGENT)): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="conversation")
             ),
@@ -165,6 +240,45 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
                 selector.NumberSelectorConfig(min=5, max=100, step=5, unit_of_measurement="%", mode=selector.NumberSelectorMode.SLIDER)
             ),
             vol.Required(CONF_DUCK_MEDIA, **d(CONF_DUCK_MEDIA, True)): selector.BooleanSelector(),
+            vol.Required(CONF_ROOM_VOLUME, **d(CONF_ROOM_VOLUME, True)): selector.BooleanSelector(),
+            vol.Optional(CONF_FULL_VOLUME_SPEAKERS, **d(CONF_FULL_VOLUME_SPEAKERS, [])): _SPEAKER,
+            vol.Required(CONF_MEDIA_SPEAKERS, **d(CONF_MEDIA_SPEAKERS, True)): selector.BooleanSelector(),
+            vol.Required(CONF_MEDIA_IMPORTANT_ONLY, **d(CONF_MEDIA_IMPORTANT_ONLY, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_TTS_ENTITY, **d(CONF_TTS_ENTITY)): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="tts")
+            ),
+            vol.Required(CONF_FOLLOW_YOU, **d(CONF_FOLLOW_YOU, True)): selector.BooleanSelector(),
+            vol.Required(CONF_FOLLOW_MINUTES, **d(CONF_FOLLOW_MINUTES, DEFAULT_FOLLOW_MINUTES)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=5, max=720, step=5, unit_of_measurement="min", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_CONVERSATIONS, **d(CONF_CONVERSATIONS, True)): selector.BooleanSelector(),
+            vol.Required(CONF_FOLLOW_UPS, **d(CONF_FOLLOW_UPS, True)): selector.BooleanSelector(),
+            vol.Required(CONF_CURIOSITY, **d(CONF_CURIOSITY, True)): selector.BooleanSelector(),
+            vol.Required(CONF_REFLECTION, **d(CONF_REFLECTION, True)): selector.BooleanSelector(),
+            vol.Required(CONF_REFLECTION_TIME, **d(CONF_REFLECTION_TIME, DEFAULT_REFLECTION_TIME)): selector.TimeSelector(),
+            vol.Required(CONF_SLEEP, **d(CONF_SLEEP, True)): selector.BooleanSelector(),
+            vol.Required(CONF_SLEEP_MINUTES, **d(CONF_SLEEP_MINUTES, DEFAULT_SLEEP_MINUTES)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=5, max=120, step=5, unit_of_measurement="min", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_BEDTIME_ROUTINES, **d(CONF_BEDTIME_ROUTINES, "")): selector.TextSelector(),
+            vol.Optional(CONF_SLEEP_ACTIONS, **d(CONF_SLEEP_ACTIONS, [])): selector.ActionSelector(),
+            vol.Optional(CONF_WAKE_ACTIONS, **d(CONF_WAKE_ACTIONS, [])): selector.ActionSelector(),
+            vol.Required(CONF_FORESIGHT, **d(CONF_FORESIGHT, True)): selector.BooleanSelector(),
+            vol.Required(CONF_FORESIGHT_TIME, **d(CONF_FORESIGHT_TIME, DEFAULT_FORESIGHT_TIME)): selector.TimeSelector(),
+            vol.Optional(CONF_APPLIANCES, **d(CONF_APPLIANCES, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["sensor", "vacuum", "switch", "binary_sensor", "select", "climate", "water_heater", "media_player", "fan"], multiple=True)
+            ),
+            vol.Required(CONF_APPLIANCE_ANNOUNCE, **d(CONF_APPLIANCE_ANNOUNCE, True)): selector.BooleanSelector(),
+            vol.Required(CONF_APPLIANCE_WATTS, **d(CONF_APPLIANCE_WATTS, DEFAULT_APPLIANCE_WATTS)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=200, step=1, unit_of_measurement="W", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_DRIVE_CAMERA, **d(CONF_DRIVE_CAMERA)): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="camera")
+            ),
+            vol.Required(CONF_DRIVE_SPOT, **d(CONF_DRIVE_SPOT, DEFAULT_DRIVE_SPOT)): selector.TextSelector(),
+            vol.Optional(CONF_DRIVE_TRIGGERS, **d(CONF_DRIVE_TRIGGERS, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+            ),
             vol.Required(CONF_CRITICAL, **d(CONF_CRITICAL, True)): selector.BooleanSelector(),
             vol.Required(CONF_LEFT_OPEN_MINUTES, **d(CONF_LEFT_OPEN_MINUTES, 0)): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=0, max=240, step=5, unit_of_measurement="min", mode=selector.NumberSelectorMode.BOX)
@@ -194,7 +308,7 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
             ),
             vol.Required(CONF_NIGHT_WATCH_ANNOUNCE, **d(CONF_NIGHT_WATCH_ANNOUNCE, False)): selector.BooleanSelector(),
             vol.Optional(CONF_NIGHT_WATCH_SPEAKERS, **d(CONF_NIGHT_WATCH_SPEAKERS, [])): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="assist_satellite", multiple=True)
+                selector.EntitySelectorConfig(domain=["assist_satellite", "media_player"], multiple=True)
             ),
             vol.Required(CONF_CAMSEC, **d(CONF_CAMSEC, False)): selector.BooleanSelector(),
             vol.Optional(CONF_CAMSEC_SENSORS, **d(CONF_CAMSEC_SENSORS, [])): selector.EntitySelector(

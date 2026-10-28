@@ -30,7 +30,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: SentientConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     phones = [NotifyTargetSwitch(hass, entry, target) for target in entry.runtime_data.options.get(CONF_NOTIFY_TARGETS) or []]
-    async_add_entities([HushSwitch(entry), GuestSwitch(entry), ChimeSwitch(entry), PartySwitch(entry), AnnounceVisitorsSwitch(entry), *phones])
+    async_add_entities([HushSwitch(entry), GuestSwitch(entry), ChimeSwitch(entry), PartySwitch(entry), MediaSpeakersSwitch(entry), MediaImportantOnlySwitch(entry), AwayLightsSwitch(entry), ScreenSwitch(entry), AnnounceVisitorsSwitch(entry), *phones])
 
 
 class NotifyTargetSwitch(SwitchEntity, RestoreEntity):
@@ -208,6 +208,126 @@ class AnnounceVisitorsSwitch(_ModeSwitch):
         visitors = entry.runtime_data.visitors
         visitors.options = {**visitors.options, CONF_ANNOUNCE_VISITORS: on}
         self.async_write_ha_state()
+
+
+class MediaSpeakersSwitch(_ModeSwitch):
+    """Echos and other media players as speakers (the same as the setting)."""
+
+    _attr_icon = "mdi:speaker-multiple"
+
+    def __init__(self, entry: SentientConfigEntry) -> None:
+        super().__init__(entry, "media_speakers")
+
+    @property
+    def is_on(self) -> bool:
+        return self._entry.runtime_data.speech.media_on
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self._set(False)
+
+    def _set(self, on: bool) -> None:
+        from .const import CONF_MEDIA_SPEAKERS
+
+        entry = self._entry
+        self.hass.config_entries.async_update_entry(entry, options={**entry.data, **entry.options, CONF_MEDIA_SPEAKERS: on})
+        entry.runtime_data.speech.options = {**entry.runtime_data.speech.options, CONF_MEDIA_SPEAKERS: on}
+        self.async_write_ha_state()
+        self.hass.bus.async_fire(EVENT_MODE_CHANGED, {"media_speakers": on})
+
+
+class MediaImportantOnlySwitch(_ModeSwitch):
+    """Echos only for alarms, reminders and safety alerts (the same as the setting)."""
+
+    _attr_icon = "mdi:alarm-bell"
+
+    def __init__(self, entry: SentientConfigEntry) -> None:
+        super().__init__(entry, "media_important_only")
+
+    @property
+    def is_on(self) -> bool:
+        return self._entry.runtime_data.speech.media_important_only
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self._set(False)
+
+    def _set(self, on: bool) -> None:
+        from .const import CONF_MEDIA_IMPORTANT_ONLY
+
+        entry = self._entry
+        self.hass.config_entries.async_update_entry(entry, options={**entry.data, **entry.options, CONF_MEDIA_IMPORTANT_ONLY: on})
+        entry.runtime_data.speech.options = {**entry.runtime_data.speech.options, CONF_MEDIA_IMPORTANT_ONLY: on}
+        self.async_write_ha_state()
+        self.hass.bus.async_fire(EVENT_MODE_CHANGED, {"media_important_only": on})
+
+
+class AwayLightsSwitch(_ModeSwitch):
+    """Lights that copy last week while everyone's out (the same as the setting)."""
+
+    _attr_icon = "mdi:home-export-outline"
+
+    def __init__(self, entry: SentientConfigEntry) -> None:
+        super().__init__(entry, "away_lights")
+
+    @property
+    def is_on(self) -> bool:
+        return self._entry.runtime_data.away.enabled
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return self._entry.runtime_data.away.describe()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self._set(False)
+
+    def _set(self, on: bool) -> None:
+        from .const import CONF_AWAY_LIGHTS_ON
+
+        entry = self._entry
+        self.hass.config_entries.async_update_entry(entry, options={**entry.data, **entry.options, CONF_AWAY_LIGHTS_ON: on})
+        entry.runtime_data.away.options = {**entry.runtime_data.away.options, CONF_AWAY_LIGHTS_ON: on}
+        self.async_write_ha_state()
+        self.hass.bus.async_fire(EVENT_MODE_CHANGED, {"away_lights": on})
+
+
+class ScreenSwitch(_ModeSwitch):
+    """The tablet screen: alerts, notices and the morning card (the same as the setting)."""
+
+    _attr_icon = "mdi:tablet-dashboard"
+
+    def __init__(self, entry: SentientConfigEntry) -> None:
+        super().__init__(entry, "screen")
+
+    @property
+    def is_on(self) -> bool:
+        return self._entry.runtime_data.screen.enabled
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self._set(False)
+
+    def _set(self, on: bool) -> None:
+        from .const import CONF_SCREEN
+
+        entry = self._entry
+        self.hass.config_entries.async_update_entry(entry, options={**entry.data, **entry.options, CONF_SCREEN: on})
+        entry.runtime_data.screen.options = {**entry.runtime_data.screen.options, CONF_SCREEN: on}
+        if not on:
+            entry.runtime_data.screen.dismiss(None)
+        self.async_write_ha_state()
+        self.hass.bus.async_fire(EVENT_MODE_CHANGED, {"screen": on})
+
+
 class PartySwitch(_ModeSwitch):
     """Light show: the chosen lights put on a show, then go back as they were."""
 

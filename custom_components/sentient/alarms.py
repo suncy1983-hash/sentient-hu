@@ -99,6 +99,13 @@ class Alarms:
             changes["enabled"] = False  # a one-off: done
         self.items.update(alarm["id"], **changes)
         local = dt_util.as_local(now)
+        if alarm.get("silent"):
+            rt.timeline.add("mode", alarm["name"], "schedule")
+            try:
+                await async_run_actions(self.hass, alarm.get("actions") or [], alarm["name"])
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("Alarm %s: actions failed: %s", alarm["name"], err)
+            return {"spoken": False, "reason": "silent"}
         message = (alarm.get("message") or "").strip()
         if "{tomorrow:" in message or "{today:" in message:
             message = await self._fill_calendar(message, local)
@@ -174,6 +181,6 @@ class Alarms:
         for a in self.items.items.values():
             nxt = next_ring(a, now)
             out.append({"id": a["id"], "name": a["name"], "time": str(a.get("time"))[:5], "days": a.get("days") or [],
-                        "description": a.get("description") or "", "on": a.get("enabled", True),
+                        "description": a.get("description") or "", "on": a.get("enabled", True), "silent": bool(a.get("silent")),
                         "next": nxt.isoformat() if nxt else None})
         return sorted(out, key=lambda x: x["next"] or "9")

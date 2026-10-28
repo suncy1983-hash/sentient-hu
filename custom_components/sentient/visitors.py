@@ -349,7 +349,7 @@ class Visitors:
     async def async_doorstep_check(self) -> bool | None:
         """Look once for a parcel left by someone who didn't ring. Returns whether one is there."""
         self._doorstep_pending = False
-        if self._busy or not self.camera or not self.watches.spend():
+        if self._busy or not self.camera or not self.watches.spend("doorbell"):
             return None
         self._doorstep_last = dt_util.utcnow()
         self._busy = True
@@ -408,9 +408,7 @@ class Visitors:
     async def async_visit(self, trigger: str | None = None) -> dict[str, Any] | None:
         if self._busy:
             return None
-        if not self.watches.spend():
-            _LOGGER.debug("Visitor not described: daily AI limit reached")
-            return None
+        look = self.watches.spend("doorbell")  # today's limit used up: still logged and said, in plain words
         camera = self.camera_for(trigger)
         place = self.place_for(camera)
         self._busy = True
@@ -428,7 +426,7 @@ class Visitors:
             picture = await self.picture_for(trigger, camera)
             if self.faces is not None and self.faces.enabled:
                 face_task = self.hass.async_create_task(self._faces_in(picture), eager_start=False)
-            result = await self._look(
+            result = {} if not look else await self._look(
                 "Sentient: who's at the door",
                 "This is a camera picture at the door or gate, taken as someone rang or was seen there. "
                 "Describe who is there in a few plain words (e.g. 'a delivery driver holding a small "
@@ -454,10 +452,11 @@ class Visitors:
             )
             face = await face_task if face_task is not None else None
         except HomeAssistantError as err:
-            _LOGGER.warning("Sentient could not look at the door: %s", err)
+            _LOGGER.info("Sentient couldn't look at the door, so it's plain: %s", err)
+            result = {}
+            face = None
             if face_task is not None:
                 face_task.cancel()
-            return None
         finally:
             self._busy = False
         kind = result.get("kind") if result.get("kind") in KINDS else "unknown"
@@ -507,12 +506,15 @@ class Visitors:
             # visitor walking past a second time
             return visit
         if self.options.get(CONF_ANNOUNCE_VISITORS, DEFAULT_ANNOUNCE_VISITORS) and kind != "nobody":
+            described = bool(result.get("description"))
             if place:
                 line = (t("visitors.named_at_place", name=name, place=place) if name
-                        else t("visitors.someone_at_place", description=visit["description"], place=place))
+                        else t("visitors.someone_at_place", description=visit["description"], place=place) if described
+                        else t("visitors.just_someone_at_place", place=place))
             else:
                 line = (t("visitors.named_at_door", name=name) if name
-                        else t("visitors.someone_at_door", description=visit["description"]))
+                        else t("visitors.someone_at_door", description=visit["description"]) if described
+                        else t("visitors.just_someone_at_door"))
             await self.speech.async_say(line, "normal", None, source="visitors")
         if (kind == "delivery" or visit["parcel"]) and self.options.get(CONF_PARCEL_ALERTS, DEFAULT_PARCEL_ALERTS):
             @callback
@@ -523,7 +525,7 @@ class Visitors:
         return visit
 
     async def _async_parcel_check(self, visit: dict[str, Any], camera: str | None = None) -> None:
-        if not self.watches.spend():
+        if not self.watches.spend("doorbell"):
             return
         try:
             result = await self._look(

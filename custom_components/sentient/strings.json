@@ -23,10 +23,10 @@
           "prompt_memories": "Memories to share with voice assistants",
           "pass_through_areas": "Pass-through areas",
           "all_occupied": "Speak in every occupied room",
-          "ai_task_entity": "AI for camera checks",
+          "ai_task_entity": "AI for background jobs",
           "camera_cooldown": "Minimum gap between camera checks",
           "fallback_speakers": "Backup-only speakers",
-          "daily_ai_limit": "Camera checks per day",
+          "daily_ai_limit": "AI calls per day",
           "notice_entities": "Things to notice",
           "chattiness": "How chatty",
           "house_rules": "House rules",
@@ -45,6 +45,18 @@
           "health_ignore": "Ignore for house health",
           "second_opinion_ai": "Second opinion AI",
           "chime": "Chime before speaking",
+          "voice_agent": "Main AI voice agent",
+          "backup_agent": "Backup agent",
+          "animal_sensors": "Animals' temperature sensors",
+          "away_lights_on": "Away lights",
+          "away_people": "Away when all of these are out",
+          "away_lights": "Lights to use",
+          "away_after": "Start after everyone's been out for",
+          "animal_low": "Too cold below",
+          "animal_high": "Too hot above",
+          "screen": "Use the tablet screen",
+          "screen_actions": "When something appears",
+          "screen_clear_actions": "When it's all cleared",
           "voice_stt_base": "Speech-to-text behind voice recognition",
           "voice_id_url": "Voice ID app address",
           "embed_url": "Semantic memory address"
@@ -55,10 +67,10 @@
           "prompt_memories": "How many memories are given to the voice assistant up front. The rest can still be searched.",
           "pass_through_areas": "Hallways, landings and stairs. Walking through these counts for much less, so a passer-by doesn't steal an announcement.",
           "all_occupied": "On: everyone who's home hears it. Off: only the busiest room.",
-          "ai_task_entity": "Used by camera watches. Leave empty to use Home Assistant's preferred AI task.",
+          "ai_task_entity": "The AI task used for camera looks, briefings, the nightly think and the look at tomorrow. Empty uses Home Assistant's preferred AI task.",
           "camera_cooldown": "A camera watch looks again at most this often, to keep AI costs down.",
           "fallback_speakers": "Only used when nobody is in any other speaker's room, e.g. a living room you'd rather not disturb.",
-          "daily_ai_limit": "Background camera checks stop for the day after this many. Questions you ask still get answered.",
+          "daily_ai_limit": "Background AI calls (camera checks, briefings, the nightly think, the doorbell…) stop for the day after this many, and it uses plain words instead. Questions you ask still get answered. 0 means no limit.",
           "notice_entities": "When these change, the AI decides whether it's worth saying something (or asking). e.g. washing machine, doors, weather, bins.",
           "chattiness": "Limits remarks per hour: quiet 2, normal 4, chatty 8. Off stops noticing.",
           "house_rules": "Plain sentences every voice must follow, one per line, e.g. 'Never say the house is empty.'",
@@ -74,6 +86,18 @@
           "sidebar_panel": "A page in the sidebar showing memories, routines, watches, visitors and what's been said.",
           "chat_agent": "Who answers the page's Ask box — pick a voice agent that has Sentient ticked. Empty uses your preferred Assist pipeline.",
           "health_ignore": "Entities (and their devices) that shouldn't count as problems, e.g. something that's meant to be off.",
+          "voice_agent": "The AI agent that normally answers (e.g. Google AI). Empty uses the page's chat agent.",
+          "backup_agent": "Answers when the main agent fails — Home Assistant's own agent does lights, heating and timers without any AI.",
+          "animal_sensors": "Hutch, kennel, coop or tank temperature sensors.",
+          "away_lights_on": "When everyone's out after dark, the lights copy how they were used at the same time last week (from Home Assistant's history), a few minutes either way. Doesn't start (or stops) if anyone's home or there's been movement inside lately, for people without a phone tracked, and puts back what it switched on. Also an 'Away lights' switch.",
+          "away_people": "Empty: everyone with a person entry.",
+          "away_lights": "Empty: every light in a room, leaving out screens, LED rings, backlights and groups. Only lights that were used at that time last week come on.",
+          "away_after": "So popping to the shop doesn't start it.",
+          "animal_low": "Says once when it drops below this (held until morning in quiet hours), and warns the evening before a frost.",
+          "animal_high": "Says once when it rises above this.",
+          "screen": "Alerts, notices and a morning card on the Sentient screen card (custom:sentient-screen-card). Off: it only shows the house at a glance.",
+          "screen_actions": "e.g. wake a tablet and switch it to the page with the screen card.",
+          "screen_clear_actions": "e.g. switch the tablet back to its normal page.",
           "voice_stt_base": "Sentient's voice STT passes the audio on to this one for the words (e.g. Home Assistant Cloud). Leave empty to use the first other one.",
           "voice_id_url": "Where the Sentient Voice ID app listens, e.g. http://xxxxxxxx-sentient-voice-id:8765. Empty turns voice recognition off.",
           "embed_url": "Where the Sentient app's text model listens (the same app as Voice ID). Empty uses the Voice ID address; with neither, memories are found by keywords only."
@@ -109,10 +133,10 @@
           "prompt_memories": "Memories to share with voice assistants",
           "pass_through_areas": "Pass-through areas",
           "all_occupied": "Speak in every occupied room",
-          "ai_task_entity": "AI for camera checks",
+          "ai_task_entity": "AI for background jobs",
           "camera_cooldown": "Minimum gap between camera checks",
           "fallback_speakers": "Backup-only speakers",
-          "daily_ai_limit": "Camera checks per day",
+          "daily_ai_limit": "AI calls per day",
           "notice_entities": "Things to notice",
           "chattiness": "How chatty",
           "house_rules": "House rules",
@@ -173,6 +197,43 @@
           "party_sound": "Follow the sound from",
           "party_show": "Buttons on the overview",
           "party_sound_switch": "Turn on while listening",
+          "room_volume": "Speak up in a noisy room",
+          "follow_you": "Messages follow people",
+          "follow_minutes": "Keep messages to pass on for",
+          "conversation_memory": "Remember conversations",
+          "follow_ups": "Check back on things",
+          "curiosity": "Curiosity",
+          "reflection": "Overnight reflection",
+          "reflection_time": "Reflect at",
+          "drive_spot": "Drive spot",
+          "drive_camera": "Drive camera",
+          "drive_triggers": "Look when these settle",
+          "full_volume_speakers": "Full volume on these speakers",
+          "tts_entity": "Voice for other speakers",
+          "media_speakers": "Use Echos and other media players",
+          "media_important_only": "Echos: alarms and reminders only",
+          "foresight": "A look at tomorrow",
+          "foresight_time": "Look ahead at",
+          "sleep_detection": "Know when the house is asleep",
+          "sleep_minutes": "Asleep after nothing's moved for",
+          "bedtime_routines": "Bedtime routines",
+          "sleep_actions": "When the house goes to sleep, do",
+          "wake_actions": "When someone's up, do",
+          "appliances": "Appliances to follow",
+          "appliance_announce": "Say when they finish",
+          "appliance_watts": "Running above",
+          "voice_agent": "Main AI voice agent",
+          "backup_agent": "Backup agent",
+          "animal_sensors": "Animals' temperature sensors",
+          "away_lights_on": "Away lights",
+          "away_people": "Away when all of these are out",
+          "away_lights": "Lights to use",
+          "away_after": "Start after everyone's been out for",
+          "animal_low": "Too cold below",
+          "animal_high": "Too hot above",
+          "screen": "Use the tablet screen",
+          "screen_actions": "When something appears",
+          "screen_clear_actions": "When it's all cleared",
           "voice_stt_base": "Speech-to-text behind voice recognition",
           "voice_id_url": "Voice ID app address",
           "embed_url": "Semantic memory address"
@@ -183,10 +244,10 @@
           "prompt_memories": "How many memories are given to the voice assistant up front. The rest can still be searched.",
           "pass_through_areas": "Hallways, landings and stairs. Walking through these counts for much less, so a passer-by doesn't steal an announcement.",
           "all_occupied": "On: everyone who's home hears it. Off: only the busiest room.",
-          "ai_task_entity": "Used by camera watches. Leave empty to use Home Assistant's preferred AI task.",
+          "ai_task_entity": "The AI task used for camera looks, briefings, the nightly think and the look at tomorrow. Empty uses Home Assistant's preferred AI task.",
           "camera_cooldown": "A camera watch looks again at most this often, to keep AI costs down.",
           "fallback_speakers": "Only used when nobody is in any other speaker's room, e.g. a living room you'd rather not disturb.",
-          "daily_ai_limit": "Background camera checks stop for the day after this many. Questions you ask still get answered.",
+          "daily_ai_limit": "Background AI calls (camera checks, briefings, the nightly think, the doorbell…) stop for the day after this many, and it uses plain words instead. Questions you ask still get answered. 0 means no limit.",
           "notice_entities": "When these change, the AI decides whether it's worth saying something (or asking). e.g. washing machine, doors, weather, bins.",
           "chattiness": "Limits remarks per hour: quiet 2, normal 4, chatty 8. Off stops noticing.",
           "house_rules": "Plain sentences every voice must follow, one per line, e.g. 'Never say the house is empty.'",
@@ -244,6 +305,43 @@
           "party_sound": "Optional: a loudness sensor in dB, such as a voice speaker's microphone through ESPHome's sound_level sensor. Disco, party, rainbow and Halloween then follow the music — louder is brighter, and each beat changes colour.",
           "party_show": "Which shows get a button on the overview. Leave empty for none; every show still works by voice.",
           "party_sound_switch": "Optional: a switch that makes the loudness sensor report (so it isn't sending readings all day). It's turned on while a show follows the sound and off afterwards. Found automatically if it's on the same device and has 'loudness' in its name.",
+          "room_volume": "Speakers that can hear the room (a loudness sensor on the same device) have a one-second listen first and speak louder over a TV or chatter. Not in quiet hours.",
+          "follow_you": "Something said where nobody was about — or held back for quiet hours — is passed on the next time someone walks into a room with a speaker.",
+          "follow_minutes": "After this long an unheard message is dropped.",
+          "conversation_memory": "Keeps a short record of what was asked and said on every speaker, so another room can pick up where one left off. Kept two weeks; private while guests are in.",
+          "follow_ups": "Voices can set follow-ups (\"I'll check the room's warmed up in an hour\") and a watch that runs out with nothing seen is closed off out loud.",
+          "curiosity": "At most once a day, when someone's about, it asks about something it can't explain — a regular caller, a pattern it noticed overnight — and remembers the answer.",
+          "reflection": "One AI call each night over the day's log and conversations: new things worth remembering, a thought or two for the morning, and a question to ask.",
+          "reflection_time": "Best in the small hours.",
+          "drive_spot": "The camera spot that shows the drive (draw it on the Spots tab).",
+          "drive_camera": "Only needed if more than one camera has a spot with that name.",
+          "drive_triggers": "Motion or car sensors that see the drive. Empty: the camera's own motion and car sensors.",
+          "full_volume_speakers": "Announcements on these are said at 100%, then the volume goes back — for tablets turned down for everything else. Not in quiet hours (the quiet-hours volume is used then).",
+          "tts_entity": "Speakers can be Assist speakers or media players. Echos are spoken to through Alexa Media Player; any other media player (a smart speaker, a Cast device) uses this text-to-speech voice.",
+          "speakers": "Assist speakers or media players (Echos through Alexa Media Player).",
+          "media_speakers": "Off: only the voice speakers are used, even where an alarm or announcement names an Echo (it goes where people are instead). Also an 'Echo speakers' switch for automations and dashboards.",
+          "media_important_only": "On: the Echos only say alarms, reminders and safety alerts; announcements, notices and chat go to the voice speakers instead. Also an 'Echos: alarms and reminders only' switch.",
+          "foresight": "Each evening one AI look at tomorrow's calendars, weather, alarms and reminders. Says something only when there's something to do tonight — frost before an early start, rain on washing day. Usually silent.",
+          "foresight_time": "Before quiet hours start.",
+          "sleep_detection": "Asleep after a bedtime routine, or in quiet hours once nothing inside has moved for a while. Awake in the morning when there's movement in two rooms (or a light switched on by hand). A House sensor shows it.",
+          "bedtime_routines": "Routines that mean everyone's gone to bed, comma separated. Empty: any routine with 'night' or 'bed' in its name.",
+          "sleep_actions": "e.g. tablet screens off, the Echo speakers switch off.",
+          "wake_actions": "e.g. the Echo speakers back on, the hallway light on low.",
+          "appliances": "Washing machine, dryer, dishwasher, hoover — their power sensor or status. Leave empty to follow every robot vacuum and any power sensor named washing machine, dryer or dishwasher.",
+          "appliance_announce": "Says “the washing machine's finished” where people are, and when one is taking far longer than usual. Plain words, no AI.",
+          "appliance_watts": "For power sensors: running while above this, finished once it's stayed below for five minutes.",
+          "voice_agent": "The AI agent that normally answers (e.g. Google AI). Empty uses the page's chat agent.",
+          "backup_agent": "Answers when the main agent fails — Home Assistant's own agent does lights, heating and timers without any AI.",
+          "animal_sensors": "Hutch, kennel, coop or tank temperature sensors.",
+          "away_lights_on": "When everyone's out after dark, the lights copy how they were used at the same time last week (from Home Assistant's history), a few minutes either way. Doesn't start (or stops) if anyone's home or there's been movement inside lately, for people without a phone tracked, and puts back what it switched on. Also an 'Away lights' switch.",
+          "away_people": "Empty: everyone with a person entry.",
+          "away_lights": "Empty: every light in a room, leaving out screens, LED rings, backlights and groups. Only lights that were used at that time last week come on.",
+          "away_after": "So popping to the shop doesn't start it.",
+          "animal_low": "Says once when it drops below this (held until morning in quiet hours), and warns the evening before a frost.",
+          "animal_high": "Says once when it rises above this.",
+          "screen": "Alerts, notices and a morning card on the Sentient screen card (custom:sentient-screen-card). Off: it only shows the house at a glance.",
+          "screen_actions": "e.g. wake a tablet and switch it to the page with the screen card.",
+          "screen_clear_actions": "e.g. switch the tablet back to its normal page.",
           "voice_stt_base": "Sentient's voice STT passes the audio on to this one for the words (e.g. Home Assistant Cloud). Leave empty to use the first other one.",
           "voice_id_url": "Where the Sentient Voice ID app listens, e.g. http://xxxxxxxx-sentient-voice-id:8765. Empty turns voice recognition off.",
           "embed_url": "Where the Sentient app's text model listens (the same app as Voice ID). Empty uses the Voice ID address; with neither, memories are found by keywords only."
@@ -314,6 +412,28 @@
       "health": {
         "name": "House health"
       },
+      "drive": {
+        "name": "Drive"
+      },
+      "mind": {
+        "name": "Mind"
+      },
+      "house": {
+        "name": "House",
+        "state": {
+          "awake": "Awake",
+          "asleep": "Asleep"
+        }
+      },
+      "screen": {
+        "name": "Screen",
+        "state": {
+          "idle": "Idle",
+          "morning": "Morning",
+          "notice": "Notice",
+          "alert": "Alert"
+        }
+      },
       "speaker": {
         "name": "Speaker"
       }
@@ -331,11 +451,28 @@
       "party_mode": {
         "name": "Light show"
       },
+      "media_speakers": {
+        "name": "Echo speakers"
+      },
+      "media_important_only": {
+        "name": "Echos: alarms and reminders only"
+      },
+      "away_lights": {
+        "name": "Away lights"
+      },
+      "screen": {
+        "name": "Tablet screen"
+      },
       "notify_target": {
         "name": "Notifications: {name}"
       },
       "announce_visitors": {
         "name": "Announce visitors"
+      }
+    },
+    "conversation": {
+      "voice": {
+        "name": "With backup"
       }
     },
     "stt": {
@@ -358,7 +495,8 @@
         "preference": "Preference",
         "person": "Person",
         "routine": "Routine",
-        "note": "Note"
+        "note": "Note",
+        "correction": "Correction"
       }
     },
     "chattiness": {
@@ -661,6 +799,10 @@
         "speak": {
           "name": "Speak",
           "description": "Say the result where people are."
+        },
+        "details": {
+          "name": "Details",
+          "description": "For routines that take details, e.g. which rooms."
         }
       }
     },
@@ -693,6 +835,140 @@
           "description": "Use exactly these lights."
         }
       }
+    },
+    "reflect": {
+      "name": "Reflect now",
+      "description": "Think over the last day now, as it does overnight: new memories, morning thoughts and a question."
+    },
+    "check_drive": {
+      "name": "Check the drive",
+      "description": "Take one AI look at the drive spot now and update what's parked there."
+    },
+    "wonder": {
+      "name": "Wonder",
+      "description": "Add a question for curiosity to ask, drop one, or ask the next one now.",
+      "fields": {
+        "question": {
+          "name": "Question",
+          "description": "Something to ask the household once."
+        },
+        "ask_now": {
+          "name": "Ask now",
+          "description": "Ask the next question straight away."
+        },
+        "dismiss": {
+          "name": "Dismiss",
+          "description": "Words from a question not to ask after all."
+        }
+      }
+    },
+    "follow_up": {
+      "name": "Follow up",
+      "description": "Check back on something later and say how it went.",
+      "fields": {
+        "minutes": {
+          "name": "Minutes",
+          "description": "When to check."
+        },
+        "about": {
+          "name": "About",
+          "description": "A few words on what it's about."
+        },
+        "entity": {
+          "name": "Entity",
+          "description": "Device to check then."
+        },
+        "state": {
+          "name": "State",
+          "description": "The state that means it worked."
+        },
+        "above": {
+          "name": "Above",
+          "description": "Worked if the value is at least this."
+        },
+        "below": {
+          "name": "Below",
+          "description": "Worked if the value is at most this."
+        },
+        "if_done": {
+          "name": "If done",
+          "description": "What to say if it worked."
+        },
+        "if_not": {
+          "name": "If not",
+          "description": "What to say if it didn't."
+        },
+        "speaker": {
+          "name": "Speaker",
+          "description": "Where to say it (default: where people are)."
+        }
+      }
+    },
+    "cancel_follow_up": {
+      "name": "Cancel a follow-up",
+      "description": "Stop it checking back on something.",
+      "fields": {
+        "about": {
+          "name": "About",
+          "description": "Its id, or words from what it's about."
+        }
+      }
+    },
+    "look_ahead": {
+      "name": "Look ahead",
+      "description": "Look at tomorrow now and say whether there's anything worth a heads-up.",
+      "fields": {
+        "speak": {
+          "name": "Say it",
+          "description": "Say it out loud if there is."
+        }
+      }
+    },
+    "set_asleep": {
+      "name": "Set asleep",
+      "description": "Tell the house it's asleep or awake (runs the bedtime or morning actions).",
+      "fields": {
+        "asleep": {
+          "name": "Asleep",
+          "description": "On for asleep, off for awake."
+        }
+      }
+    },
+    "show_on_screen": {
+      "name": "Show on screen",
+      "description": "Put a card on the Sentient screen card.",
+      "fields": {
+        "message": {
+          "name": "Message",
+          "description": "What to show."
+        },
+        "camera": {
+          "name": "Camera",
+          "description": "A camera to show with it."
+        },
+        "minutes": {
+          "name": "For",
+          "description": "How long (10 minutes if empty)."
+        },
+        "alert": {
+          "name": "Alert",
+          "description": "Show it as an alert."
+        }
+      }
+    },
+    "clear_screen": {
+      "name": "Clear the screen",
+      "description": "Take a card off the Sentient screen card, or everything.",
+      "fields": {
+        "card_id": {
+          "name": "Card",
+          "description": "The card's id, 'morning', or empty for everything."
+        }
+      }
+    },
+    "morning_card": {
+      "name": "Morning card",
+      "description": "Put this morning's card on the Sentient screen now."
     },
     "learn_face": {
       "name": "Learn a face",
