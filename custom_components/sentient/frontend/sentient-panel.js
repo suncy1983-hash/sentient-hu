@@ -101,7 +101,7 @@
           <button class="brief" id="brief"><ha-icon icon="mdi:text-box-outline"></ha-icon><span>BRIEFING</span></button></div>
         <div class="reply" id="reply" hidden></div>
         <div class="page" id="ov"><div id="head" class="card head"></div>
-          <div class="cols"><div class="col stack"><div id="health" class="card"></div><div id="sec" class="card"></div><div id="watch" class="card"></div><div id="mlc" class="card" hidden></div></div>
+          <div class="cols"><div class="col stack"><div id="sug" class="card" hidden></div><div id="clipc" class="card" hidden></div><div id="health" class="card"></div><div id="sec" class="card"></div><div id="watch" class="card"></div><div id="mlc" class="card" hidden></div></div>
             <div class="col stack"><div id="mind" class="card"></div><div id="rout" class="stack"></div></div>
             <div class="col stack"><div id="apl" class="card" hidden></div><div id="ins" class="card" hidden></div><div id="energy" class="card" hidden></div><div id="visit" class="card"></div><div id="said" class="card"></div></div></div></div>
         <div class="page tlp" id="tl" hidden><div class="card"><div class="h"><span class="t">TIMELINE</span><i></i><em id="tlcount"></em></div>
@@ -184,6 +184,27 @@
           <div class="st">${stat(st("memories"), "MEMORIES ›", "memories")}${stat(st("watches"), "WATCHING")}${stat(st("routines"), "ROUTINES")}${stat(st("visitors"), "VISITORS")}${stat(st("health"), "PROBLEMS")}${stat(ai.today ?? 0, ai.limit ? `AI CALLS / ${ai.limit}` : "AI CALLS")}</div></div>
         <div class="rm"><div class="t">WHERE PEOPLE ARE</div>${bars || '<div class="b">NO RECENT MOTION</div>'}</div>`;
 
+      // suggestions: things it could use but isn't (refreshed every ten minutes; empty when turned off)
+      if (!this._sugAt || Date.now() - this._sugAt > 600000) {
+        this._sugAt = Date.now();
+        this._hass.callWS({ type: "sentient/suggestions" }).then((r) => { this._sug = r.items || []; this._render(); }, () => { this._sug = []; });
+      }
+      const sug = this._sug || [];
+      R("sug").hidden = !sug.length;
+      R("sug").innerHTML = sug.length ? this._h("SUGGESTIONS", `${sug.length}`) + sug.map((s) => `<div class="r"><ha-icon icon="mdi:lightbulb-auto-outline"></ha-icon><b class="wrap">${esc(s.text)}</b>
+          <button class="btn sm" data-act="sugyes" data-id="${esc(s.id)}">USE IT</button><a class="x" data-act="sugno" data-id="${esc(s.id)}" title="Don't suggest again">✕</a></div>`).join("") : "";
+
+      // clips watched as they happened (refreshed every two minutes; hidden when off and empty)
+      if (!this._clipAt || Date.now() - this._clipAt > 120000) {
+        this._clipAt = Date.now();
+        this._hass.callWS({ type: "sentient/clips" }).then((r) => { this._clips = r; this._render(); }, () => { this._clips = null; });
+      }
+      const cl = this._clips || { on: false, items: [] };
+      const clipIc = { delivery: "mdi:package-variant-closed", visitor: "mdi:account", household: "mdi:home-account", "passer-by": "mdi:walk", animal: "mdi:paw", vehicle: "mdi:car", suspicious: "mdi:alert-outline", nothing: "mdi:minus" };
+      R("clipc").hidden = !cl.on && !(cl.items || []).length;
+      R("clipc").innerHTML = this._h("CLIPS WATCHED", `${(cl.items || []).length}`) + ((cl.items || []).slice(0, 12).map((c) => `<div class="r"><ha-icon icon="${clipIc[c.kind] || "mdi:filmstrip-box"}"></ha-icon><b class="wrap">${esc(c.local)} · ${esc(c.camera.replace(/_/g, " ").toUpperCase())} — ${esc(c.summary)}${c.whose ? ` <i>(probably ${esc(c.whose)})</i>` : ""}</b>${c.event ? `<a class="btn sm ghost" href="/api/frigate/notifications/${encodeURIComponent(c.event)}/clip.mp4" target="_blank" rel="noopener">PLAY</a>` : ""}</div>`).join("")
+        || '<div class="e">NOTHING WATCHED YET · IT WRITES HERE WHEN THE CAMERAS SEE SOMEONE</div>');
+
       // routines
       const routines = this._attr("routines", "routines", []);
       const on = routines.filter((r) => r.adopted).length;
@@ -263,8 +284,13 @@
           <b>${esc(((c.conversation || [])[0] || "").replace(/^They: /, ""))}</b><u>${esc(String(c.when || "").split(" ").pop())}${c.room ? " · " + esc(c.room).toUpperCase() : ""}</u></div>`),
       ].join("");
       const mindCount = (mind.wondering || []).length + (mind.follow_ups || []).length;
+      // the last hour, on request: straight from the timeline, no AI
+      const lastHour = this._lh ? (this._lh.length ? this._lh.map((i) => `<div class="r dim"><ha-icon icon="mdi:clock-outline"></ha-icon>
+          <b>${esc(i.text)}</b><u>${hm(i.time)}</u></div>`).join("") : '<div class="e">NOTHING IN THE LAST HOUR</div>') : "";
       R("mind").innerHTML = this._h("MIND", mindCount ? `${mindCount} ON ITS MIND` : `${this._st("mind") ? this._st("mind").state : 0} TALKS TODAY`)
         + (mindRows || '<div class="e">NOTHING ON ITS MIND · THINKS IT OVER EACH NIGHT</div>')
+        + `<div class="row lh"><button class="btn sm ghost" data-act="lasthour"><ha-icon icon="mdi:history"></ha-icon> ${this._lh ? "HIDE THE LAST HOUR" : "WHAT HAPPENED THIS LAST HOUR?"}</button></div>`
+        + lastHour
         + (ai.by_purpose ? `<div class="hint meter">AI ${ai.today}${ai.limit ? " OF " + ai.limit : ""} TODAY${Object.keys(ai.by_purpose).length ? " · " + Object.entries(ai.by_purpose).slice(0, 3).map(([k, v]) => `${esc(k).toUpperCase()} ${v}`).join(" · ") : ""}${ai.average_per_day != null ? " · USUALLY " + ai.average_per_day + "/DAY" : ""}</div>` : "");
       this._drawAppliances(mind.appliances || []);
 
@@ -275,9 +301,13 @@
           <b>${v.name ? esc(v.name) + " — " : ""}${esc(v.description)}${v.parcel_left ? " · PARCEL LEFT" : ""}</b><u>${hm(v.time)}</u></div>`).join("")
         || '<div class="e">NO ONE AT THE DOOR YET</div>');
 
-      // said & noticed
+      // said & noticed (left alone while a "say it differently" note is being typed)
+      const styleOn = !!((this._st("mind") || {}).attributes || {}).style_feedback;
+      if (act && act.closest && act.closest('form[data-form="restyle"]')) return;
       const log = this._attr("last_spoken", "log", []).slice(0, 4).map((l) => l.said
-        ? `<div class="r"><ha-icon icon="mdi:account-voice"></ha-icon><b>${esc(l.said)}</b><u>${hm(l.time)}</u>${(this._thumbs || {})[l.said] ? `<s class="thd">${this._thumbs[l.said] === "up" ? "👍" : "👎"}</s>` : `<a class="x th" data-act="thumb" data-id="up" data-text="${esc(l.said)}" data-src="${esc(l.source || "")}" title="Good to hear"><ha-icon icon="mdi:thumb-up-outline"></ha-icon></a><a class="x th" data-act="thumb" data-id="down" data-text="${esc(l.said)}" data-src="${esc(l.source || "")}" title="Not worth saying"><ha-icon icon="mdi:thumb-down-outline"></ha-icon></a>`}</div>`
+        ? `<div class="r"><ha-icon icon="mdi:account-voice"></ha-icon><b>${esc(l.said)}</b><u>${hm(l.time)}</u>${(this._thumbs || {})[l.said] ? `<s class="thd">${this._thumbs[l.said] === "up" ? "👍" : this._thumbs[l.said] === "styled" ? "✎ NOTED" : "👎"}</s>` : `<a class="x th" data-act="thumb" data-id="up" data-text="${esc(l.said)}" data-src="${esc(l.source || "")}" title="Good to hear"><ha-icon icon="mdi:thumb-up-outline"></ha-icon></a><a class="x th" data-act="thumb" data-id="down" data-text="${esc(l.said)}" data-src="${esc(l.source || "")}" title="Not worth saying"><ha-icon icon="mdi:thumb-down-outline"></ha-icon></a>`}${styleOn ? `<a class="x th" data-act="restyle" data-text="${esc(l.said)}" title="Say it differently"><ha-icon icon="mdi:comment-edit-outline"></ha-icon></a>` : ""}</div>
+          ${styleOn && this._restyle === l.said ? `<div class="r restyle">${["Shorter", "Plainer", "Less cheeky", "More detail"].map((n) => `<button class="btn sm ghost" data-act="restyleset" data-id="${n}" data-text="${esc(l.said)}">${n.toUpperCase()}</button>`).join("")}
+            <form data-form="restyle" data-text="${esc(l.said)}"><input name="note" placeholder="Or say how…" autocomplete="off"><button class="btn sm" type="submit">SAVE</button></form><a class="x" data-act="restylex" title="Close">✕</a></div>` : ""}`
         : `<div class="r dim"><ha-icon icon="mdi:volume-off"></ha-icon><b>${esc(l.held)}</b><u>${esc(String(l.reason || "").split(":")[0].replace("_", " ")).toUpperCase()}</u></div>`).join("");
       const noticed = this._attr("last_spoken", "noticed", []).slice(0, 3).map((d) =>
         `<div class="r dim"><ha-icon icon="mdi:radar"></ha-icon><b>${esc((d.changes || []).join("; "))}</b><u>${esc(d.result).toUpperCase()}</u></div>`).join("");
@@ -292,7 +322,7 @@
       this._loadMotion();
       this._loadMutes(true);
       this._loadShortcuts();
-      ["alarms", "offers", "announce", "checks", "autooff"].forEach((k) => this._loadItems(k));
+      ["alarms", "offers", "announce", "checks", "autooff", "rules"].forEach((k) => this._loadItems(k));
       if (!this._settings && !this._settingsErr) {
         try {
           this._settings = await this._hass.callWS({ type: "sentient/settings", language: this._hass.language });
@@ -321,6 +351,7 @@
         offers: ["mdi:hand-heart-outline", "Offers", n("offers") !== null ? `${n("offers")} · fancy a brew?` : "Questions it asks — a brew?"],
         announce: ["mdi:bullhorn-outline", "Announcements", n("announce") !== null ? `${n("announce")} · doorbell, gate` : "Doorbell, gate…"],
         autooff: ["mdi:timer-off-outline", "Auto-off", n("autooff") !== null ? `${n("autooff")} · lights, coffee…` : "Off when left on or the room's empty"],
+        rules: ["mdi:script-text-outline", "Rules", n("rules") !== null ? `${n("rules")} · when this, do that` : "When this happens, do that"],
         checks: ["mdi:cctv", "Camera checks", n("checks") !== null ? `${n("checks")} watching` : "Delivery van outside?"],
         backup: ["mdi:backup-restore", "Backup", "Download or restore everything"],
       };
@@ -330,8 +361,8 @@
         ["voice", "mdi:account-voice", "Voice & sound", ["voice", "voicebackup", "quiet", "announce", "offers", "mutes", "briefing", "phone"]],
         ["cameras", "mdi:cctv", "Cameras & video", ["door", "spots", "checks", "camsec", "drive"]],
         ["security", "mdi:shield-home", "Security & safety", ["nightwatch", "safety", "health"]],
-        ["home", "mdi:home-automation", "Home & routines", ["shortcuts", "alarms", "autooff", "appliances", "animals", "away", "motion", "party", "heating", "energy"]],
-        ["brain", "mdi:brain", "Brain & system", ["memories", "mind", "noticing", "page", "backup"]],
+        ["home", "mdi:home-automation", "Home & routines", ["shortcuts", "rules", "alarms", "autooff", "appliances", "animals", "rain", "bins", "away", "motion", "party", "heating", "energy"]],
+        ["brain", "mdi:brain", "Brain & system", ["memories", "mind", "noticing", "page", "backup", "autobackup"]],
       ];
       const placed = new Set(menus.flatMap((m) => m[3]));
       Object.keys(pages).forEach((id) => { if (!placed.has(id)) menus[menus.length - 1][3].push(id); });
@@ -371,7 +402,7 @@
       if (this._group === "mutes") { this._form = null; this._loadMutes(); return; }
       if (this._group === "shortcuts") { this._form = null; this._loadShortcuts(); return; }
       if (this._group === "backup") { this._form = null; this._drawBackup(); return; }
-      if (["alarms", "offers", "announce", "checks", "autooff"].includes(this._group)) { this._form = null; this._itEdit = null; this._loadItems(this._group); return; }
+      if (["alarms", "offers", "announce", "checks", "autooff", "rules"].includes(this._group)) { this._form = null; this._itEdit = null; this._loadItems(this._group); return; }
       const g = this._settings && this._settings.groups.find((x) => x.id === this._group);
       if (!g) { this._group = "memories"; this._drawMemories(); return; }
       const body = this._$("body");
@@ -802,8 +833,20 @@
         <div class="card ml" style="margin-top:12px"><div class="r"><ha-icon icon="mdi:upload"></ha-icon><b>Restore from a backup file</b>
           <label class="tg" title="Also restore settings"><input type="checkbox" id="bkset"><i></i></label><u>ALSO SETTINGS</u>
           <button class="btn sm" data-act="bkup">CHOOSE FILE…</button></div><input type="file" id="bkfile" accept="application/json,.json" hidden></div>
+        <div class="card ml" style="margin-top:12px" id="bkauto"><div class="e">LOOKING FOR SAVED BACKUPS…</div></div>
         <div class="spmsg" id="bkmsg"></div>`;
       this._$("bkfile").addEventListener("change", (ev) => this._restore(ev.target.files[0]));
+      this._loadBackups();
+    }
+
+    async _loadBackups() {
+      let res = { items: [], on: false };
+      try { res = await this._hass.callWS({ type: "sentient/backups" }); } catch (e) { /* not admin */ }
+      const el = this._$("bkauto");
+      if (!el) return;
+      el.innerHTML = `<div class="r"><ha-icon icon="mdi:calendar-sync-outline"></ha-icon><b>Saved backups ${res.on ? "· WEEKLY IS ON" : "· WEEKLY IS OFF (Settings → Weekly backup)"}</b><button class="btn sm ghost" data-act="bksave">BACK UP NOW</button></div>`
+        + (res.items.length ? res.items.map((b) => `<div class="r dim"><ha-icon icon="mdi:file-outline"></ha-icon><b>${esc(b.name)}</b><u>${Math.round(b.size / 1024)} KB</u>
+          <button class="btn sm ghost" data-act="bkrestore" data-id="${esc(b.name)}">RESTORE</button></div>`).join("") : '<div class="e">NONE SAVED YET</div>');
     }
 
     async _download() {
@@ -1106,11 +1149,29 @@
       this._drawTimeline();
     }
 
+    async _restyleSave(text, note) {
+      try {
+        await this._hass.callWS({ type: "sentient/feedback/style", text, note });
+        this._thumbs = { ...(this._thumbs || {}), [text]: "styled" };
+      } catch (e) { /* turned off or not loaded: nothing to do */ }
+      this._restyle = null;
+      this._render();
+    }
+
+    async _lastHour() {
+      if (this._lh) { this._lh = null; this._render(); return; }
+      try {
+        const items = (await this._hass.callWS({ type: "sentient/timeline", hours: 1, limit: 30 })).items || [];
+        this._lh = items.filter((i) => !["held", "digest"].includes(i.kind));
+      } catch (e) { this._lh = []; }
+      this._render();
+    }
+
     _drawTimeline() {
       const KIND = {
         said: ["mdi:account-voice", "SAID"], held: ["mdi:volume-off", "HELD BACK"], mode: ["mdi:tune-variant", "MODE"], noticed: ["mdi:radar", "NOTICED"],
         visitor: ["mdi:doorbell-video", "VISITOR"], watch: ["mdi:bell-ring-outline", "WATCH"],
-        light: ["mdi:motion-sensor", "LIGHT"], health: ["mdi:home-heart", "HEALTH"], digest: ["mdi:creation-outline", "DIGEST"], critical: ["mdi:fire-alert", "ALERT"], energy: ["mdi:lightning-bolt", "ENERGY"], security: ["mdi:shield-alert-outline", "SECURITY"], mind: ["mdi:head-lightbulb-outline", "MIND"], loop: ["mdi:sync", "FOLLOW-UP"], drive: ["mdi:car", "DRIVE"], appliance: ["mdi:washing-machine", "APPLIANCE"], animal: ["mdi:rabbit", "ANIMALS"], voice: ["mdi:gesture-tap-button", "VOICE ACTION"],
+        light: ["mdi:motion-sensor", "LIGHT"], health: ["mdi:home-heart", "HEALTH"], digest: ["mdi:creation-outline", "DIGEST"], critical: ["mdi:fire-alert", "ALERT"], energy: ["mdi:lightning-bolt", "ENERGY"], security: ["mdi:shield-alert-outline", "SECURITY"], mind: ["mdi:head-lightbulb-outline", "MIND"], loop: ["mdi:sync", "FOLLOW-UP"], drive: ["mdi:car", "DRIVE"], appliance: ["mdi:washing-machine", "APPLIANCE"], animal: ["mdi:rabbit", "ANIMALS"], voice: ["mdi:gesture-tap-button", "VOICE ACTION"], clip: ["mdi:filmstrip-box", "CLIP"],
         heating: ["mdi:radiator", "HEATING"], learned: ["mdi:school-outline", "THIS WEEK"],
       };
       const dig = (this._tlItems || []).find((i) => i.kind === "digest");
@@ -1151,6 +1212,23 @@
       if (act === "forget") this._call("forget", { what: id }, `Forget: ${text}?`);
       else if (act === "cancel") this._call("cancel_watch", { what: id }, `Stop: ${text}?`);
       else if (act === "wonderask") this._call("wonder", { ask_now: true });
+      else if (act === "lasthour") this._lastHour();
+      else if (act === "bksave") this._hass.callWS({ type: "sentient/backups/save" }).then((r) => { this._$("bkmsg").textContent = `Saved ${r.name}.`; this._loadBackups(); }, (e) => { this._$("bkmsg").textContent = e.message || String(e); });
+      else if (act === "bkrestore") {
+        if (!window.confirm(`Restore ${id}? It adds to what's here and doesn't delete anything.`)) return;
+        this._hass.callWS({ type: "sentient/backups/restore", name: id, settings: this._$("bkset").checked }).then((res) => {
+          this._$("bkmsg").textContent = "Restored: " + Object.entries(res).map(([k, v]) => `${v} ${k.replace("_", " ")}`).join(", ") + ".";
+          this._loadMemories(); this._loadSpots(); this._loadMotion(); this._loadShortcuts();
+        }, (e) => { this._$("bkmsg").textContent = e.message || String(e); });
+      }
+      else if (act === "sugyes" || act === "sugno") {
+        this._sug = (this._sug || []).filter((s) => s.id !== id);
+        this._render();
+        this._hass.callWS({ type: "sentient/suggestions/act", suggestion: id, accept: act === "sugyes" }).catch(() => {});
+      }
+      else if (act === "restyle") { this._restyle = this._restyle === text ? null : text; this._render(); }
+      else if (act === "restylex") { this._restyle = null; this._render(); }
+      else if (act === "restyleset") this._restyleSave(text, id);
       else if (act === "wonderx") this._call("wonder", { dismiss: text });
       else if (act === "fux") this._call("cancel_follow_up", { about: id }, `Stop checking: ${text}?`);
       else if (act === "adopt") this._call("adopt_routine", { routine: id }, text);
@@ -1280,6 +1358,11 @@
       if (form.dataset.form === "mlnight") {
         const ok = await this._motionDo("sentient/motion_lights/night", { start: form.elements.start.value, end: form.elements.end.value });
         if (ok) { this._drawMotion(); const st = this._$("status"); if (st) { st.textContent = "LATE-NIGHT WINDOW SAVED ✓"; st.className = "ok"; } }
+        return;
+      }
+      if (form.dataset.form === "restyle") {
+        const note = (new FormData(form).get("note") || "").toString().trim();
+        if (note) this._restyleSave(form.dataset.text, note);
         return;
       }
       if (form.dataset.form === "remind") {
@@ -1528,6 +1611,7 @@ select{background:#0d1626;border:1px solid rgba(0,255,247,.3);border-radius:8px;
   color:#e6f5fa}
 .formwrap ha-form{display:block;max-width:880px}
 .spotgrid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:20px;align-items:start}
+.restyle{flex-wrap:wrap;gap:6px} .restyle form{display:flex;gap:6px;flex:1;min-width:180px} .restyle input{flex:1;min-width:0;background:transparent;border:1px solid rgba(0,255,247,.3);border-radius:8px;color:inherit;padding:6px 8px}
 .row{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap} .row select{flex:1;min-width:0}
 .snap{position:relative;border-radius:14px;overflow:hidden;border:1px solid rgba(0,255,247,.3);background:#000;aspect-ratio:16/9;user-select:none;touch-action:none}
 .snap img{display:block;width:100%;height:100%;object-fit:fill;pointer-events:none}
@@ -1595,6 +1679,50 @@ select{background:#0d1626;border:1px solid rgba(0,255,247,.3);border-radius:8px;
   // variants are derived); labels with numbers or names in them from HU_RULES; "A · B" labels are translated
   // part by part. Anything else — memories, names, what was said — is left exactly as it is.
   const HU_WORDS = {
+    "'Say it differently' is turned off in Sentient's settings": "A „Mondd másképp” ki van kapcsolva a Sentient beállításaiban",
+    "'Say it differently': a short note on how something should have been said, kept with the personality.": "„Mondd másképp”: egy rövid megjegyzés arról, hogyan kellett volna mondani valamit; a személyiséggel együtt megmarad.",
+    "'When this happens, do that' — e.g. when the back door opens after dark, put the kitchen light on dim.": "„Ha ez történik, csináld ezt” — pl. ha sötétedés után kinyílik a hátsó ajtó, kapcsold a konyhai lámpát halványra.",
+    "+ NEW RULE": "+ ÚJ SZABÁLY",
+    "And say (optional)": "És mondja (nem kötelező)",
+    "A word when rain's due within the hour and a window or door is left open. Reads the hourly forecast — no AI.": "Szól, ha egy órán belül eső jön, és nyitva maradt egy ablak vagy ajtó. Az óránkénti előrejelzésből — AI nélkül.",
+    "Animals that live outside: a word when their hutch, kennel or coop gets too cold or too hot, frost warnings the evening before, a look at the hutch at dusk, and a watch for cats by it at night.": "Kint élő állatok: szól, ha az ól, kutyaház vagy ketrec túl hideg vagy túl meleg, fagy előtt este figyelmeztet, alkonyatkor ránéz az ólra, és éjjel figyeli, jár-e macska körülötte.",
+    "BACK UP NOW": "MENTÉS MOST",
+    "Bins check": "Kuka-ellenőrzés",
+    "CLIP": "KLIP",
+    "CLIPS WATCHED": "MEGNÉZETT KLIPEK",
+    "Event clips": "Eseményklipek",
+    "HIDE THE LAST HOUR": "AZ UTOLSÓ ÓRA ELREJTÉSE",
+    "LOOKING FOR SAVED BACKUPS…": "MENTÉSEK KERESÉSE…",
+    "Less cheeky": "Kevésbé pimaszul",
+    "Made here or by voice ('when the back door opens after dark, turn the kitchen light on'), read back first and only made after a yes.": "Itt vagy hanggal készül („ha sötétedés után kinyílik a hátsó ajtó, kapcsold fel a konyhai lámpát”), előbb felolvassa, és csak igen után jön létre.",
+    "More detail": "Részletesebben",
+    "NONE SAVED YET": "MÉG NINCS MENTÉS",
+    "NOTHING IN THE LAST HOUR": "AZ UTOLSÓ ÓRÁBAN SEMMI",
+    "NOTHING WATCHED YET · IT WRITES HERE WHEN THE CAMERAS SEE SOMEONE": "MÉG NEM NÉZETT MEG SEMMIT · IDE ÍR, HA A KAMERÁK LÁTNAK VALAKIT",
+    "Only after dark": "Csak sötétedés után",
+    "Only if this…": "Csak ha ez…",
+    "Or say how…": "Vagy írd meg, hogyan…",
+    "PLAY": "LEJÁTSZÁS",
+    "Rain warnings": "Esőfigyelmeztetés",
+    "SUGGESTIONS": "JAVASLATOK",
+    "Saved backups": "Mentések",
+    "Say it differently": "Mondd másképp",
+    "The clips watched as they happened (newest first) — for the Sentient page.": "A megnézett klipek időrendben (legújabb elöl) — a Sentient oldalhoz.",
+    "The evening before collection (from the bin calendar), one camera look at where the bins go out — said only if they aren't out yet.": "A szállítás előtti estén (a kukanaptár alapján) egy kamerapillantás oda, ahová a kukák kikerülnek — csak akkor szól, ha még nincsenek kint.",
+    "Then do": "Akkor csinálja",
+    "USE IT": "HASZNÁLD",
+    "WHAT HAPPENED THIS LAST HOUR?": "MI TÖRTÉNT AZ UTOLSÓ ÓRÁBAN?",
+    "Watches Frigate's recorded clips from chosen cameras and writes down what happened — on the timeline, the Sentient page and for the voice. Never spoken. The clip is deleted once watched.": "Megnézi a Frigate felvett klipjeit a kiválasztott kamerákról, és leírja, mi történt — az idővonalra, a Sentient oldalra és a hangnak. Soha nem mondja ki. A klip megnézés után törlődik.",
+    "Weekly backup": "Heti mentés",
+    "What should be different?": "Min változtassak?",
+    "When this happens, do that": "Ha ez történik, csináld ezt",
+    "When this…": "Ha ez…",
+    "when this, do that": "ha ez, akkor az",
+    "Shorter": "Rövidebben",
+    "Plainer": "Egyszerűbben",
+    "Rules": "Szabályok",
+    "RULES": "SZABÁLYOK",
+    "made by voice": "hanggal készült",
     "MIND": "GONDOLATOK",
     "OVERNIGHT": "ÉJSZAKA",
     "ASK": "KÉRDEZD",

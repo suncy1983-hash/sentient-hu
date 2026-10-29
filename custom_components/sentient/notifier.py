@@ -9,18 +9,31 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import logging
+import re
+import uuid
 from typing import Any
 
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_NOTIFY_TARGETS, CONF_NOTIFY_WHEN, CONF_PERSONA, DEFAULT_NOTIFY_WHEN, DEFAULT_PERSONA
+from .const import (
+    CONF_DOOR_CAMERA,
+    CONF_NOTIFY_TARGETS,
+    CONF_NOTIFY_WHEN,
+    CONF_PERSONA,
+    CONF_PHONE_APPS,
+    CONF_PHONE_BUTTONS,
+    DEFAULT_NOTIFY_WHEN,
+    DEFAULT_PERSONA,
+)
 from . import i18n
 from .timeline import EVENT_TIMELINE
 
 _LOGGER = logging.getLogger(__name__)
 _REPEAT = timedelta(minutes=10)
+ACTION = "SENTIENT"  # prefix of this integration's notification buttons
+SNOOZE = timedelta(minutes=10)
 
 
 def wanted(item: dict[str, Any], kinds: set[str]) -> str | None:
@@ -51,6 +64,17 @@ def wanted(item: dict[str, Any], kinds: set[str]) -> str | None:
     return None
 
 
+def phone_apps(hass: HomeAssistant, options: dict[str, Any]) -> list[str]:
+    """The companion-app notify services for the phones: the ones chosen, else the apps behind the phones
+    already picked for notifications — never the tablets or a watch."""
+    apps = [a.removeprefix("notify.") for a in options.get(CONF_PHONE_APPS) or []]
+    if not apps:
+        phones = {re.sub(r"_\d+$", "", t.removeprefix("notify.")) for t in options.get(CONF_NOTIFY_TARGETS) or []}
+        apps = [s for s in hass.services.async_services().get("notify", {})
+                if s.startswith("mobile_app_") and s.removeprefix("mobile_app_") in phones]
+    return [a for a in apps if hass.services.has_service("notify", a)]
+
+
 class Notifier:
     """Sends chosen timeline items to notify entities."""
 
@@ -58,18 +82,63 @@ class Notifier:
         self.hass = hass
         self.options = options
         self._sent: dict[str, datetime] = {}
-        self._unsub = None
+        self._pending: dict[str, str] = {}  # snooze token -> what to remind about
+        self.on_snooze = None  # set by the runtime: (what, delay) -> remind again
+        self._unsubs: list = []
         self.muted: set[str] = set()  # phones switched off with their "Notifications: <name>" switch
 
     @callback
     def async_start(self) -> None:
-        self._unsub = self.hass.bus.async_listen(EVENT_TIMELINE, self._item)
+        self._unsubs = [
+            self.hass.bus.async_listen(EVENT_TIMELINE, self._item),
+            self.hass.bus.async_listen("mobile_app_notification_action", self._button),
+        ]
 
     @callback
     def async_stop(self) -> None:
-        if self._unsub:
-            self._unsub()
-            self._unsub = None
+        while getattr(self, "_unsubs", None):
+            self._unsubs.pop()()
+
+    # ----- buttons on phone notifications (the companion app) -------------------------------------
+    def buttons(self, kind: str) -> list[str]:
+        """The companion-app notify actions to send this kind with buttons, or [] for a plain notification."""
+        if kind not in (self.options.get(CONF_PHONE_BUTTONS) or []):
+            return []
+        return phone_apps(self.hass, self.options)
+
+    def _with_buttons(self, kind: str, item: dict[str, Any], targets: list[str] | None = None) -> tuple[list[str], dict[str, Any]] | None:
+        apps = self.buttons(kind)
+        if targets is not None:
+            # a phone switched off, or (for visitors) one whose owner is at home, gets nothing here either
+            stem = lambda t: re.sub(r"_\d+$", "", t.removeprefix("notify."))  # noqa: E731
+            left_out = {stem(t) for t in self.options.get(CONF_NOTIFY_TARGETS) or [] if t not in targets}
+            apps = [a for a in apps if a.removeprefix("mobile_app_") not in left_out]
+        if not apps:
+            return None
+        if kind == "door":
+            camera = self.options.get(CONF_DOOR_CAMERA)
+            data: dict[str, Any] = {"tag": "sentient-door"}
+            if camera:
+                data["image"] = f"/api/camera_proxy/{camera}"
+                data["actions"] = [{"action": "URI", "title": i18n.t("notify.show_camera"), "uri": f"entityId:{camera}"}]
+            return apps, data
+        token = uuid.uuid4().hex[:10]
+        self._pending[token] = item.get("detail") or item.get("text", "")
+        while len(self._pending) > 30:
+            self._pending.pop(next(iter(self._pending)))
+        return apps, {"tag": f"sentient-{token}", "actions": [
+            {"action": f"{ACTION}_SNOOZE_{token}", "title": i18n.t("notify.snooze")},
+            {"action": f"{ACTION}_DONE_{token}", "title": i18n.t("notify.done")},
+        ]}
+
+    @callback
+    def _button(self, event: Event) -> None:
+        action = str(event.data.get("action") or "")
+        if not action.startswith(f"{ACTION}_SNOOZE_"):
+            return
+        what = self._pending.pop(action.removeprefix(f"{ACTION}_SNOOZE_"), None)
+        if what and self.on_snooze is not None:
+            self.on_snooze(what, SNOOZE)
 
     def owner(self, target: str) -> str | None:
         """The person whose phone a notify entity is: the person tracked by a tracker on the same device."""
@@ -114,6 +183,12 @@ class Notifier:
             return
         self._sent[text.lower()] = now
         persona = self.options.get(CONF_PERSONA) or DEFAULT_PERSONA
+        kind = "door" if event.data.get("kind") == "visitor" else "reminders" if event.data.get("reminder") else None
+        rich = self._with_buttons(kind, event.data, targets) if kind else None
+        if rich is not None:
+            apps, data = rich
+            self.hass.async_create_task(self._send_app(apps, f"{persona} · {i18n.title(title)}", text, data), eager_start=True)
+            return
         self.hass.async_create_task(self._send(targets, f"{persona} · {i18n.title(title)}", text), eager_start=True)
 
     async def _send(self, targets: list[str], title: str, message: str) -> None:
@@ -123,3 +198,12 @@ class Notifier:
             )
         except Exception as err:  # noqa: BLE001 - a failed notification must never break anything else
             _LOGGER.warning("Sentient couldn't send a notification: %s", err)
+
+    async def _send_app(self, apps: list[str], title: str, message: str, data: dict[str, Any]) -> None:
+        for app in apps:
+            try:
+                await self.hass.services.async_call(
+                    "notify", app, {"title": title, "message": message, "data": data}, blocking=True
+                )
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("Sentient couldn't send a notification with buttons to %s: %s", app, err)

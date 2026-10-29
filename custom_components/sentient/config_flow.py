@@ -31,6 +31,61 @@ from .const import (
     PARTY_STYLES,
     CONF_PERSONALITY,
     CONF_PERSONALITY_NOTES,
+    CONF_STYLE_FEEDBACK,
+    CONF_SUGGESTIONS,
+    CONF_EVENT_CLIPS,
+    CONF_KNOWN_CARS,
+    CONF_RELEVANT_MEMORIES,
+    CONF_RULES,
+    CONF_FACES,
+    CONF_FACE_PEOPLE,
+    CONF_FACE_TEACH,
+    CONF_FACE_CAMERAS,
+    CONF_FACE_FORGET_HOURS,
+    CONF_CLIP_WATCH,
+    CONF_CLIP_CAMERAS,
+    CONF_CLIP_SCOPE,
+    CONF_CLIP_WHEN,
+    CONF_CLIP_NOTIFY,
+    CONF_CLIP_SOURCE,
+    CONF_CLIP_WHOSE,
+    CONF_CLIP_LOOKS,
+    CONF_CLIP_DAYS,
+    CONF_CLIP_KEEP,
+    CONF_BUDGET_CLIPS,
+    CLIP_NOTIFY_MODES,
+    CLIP_SCOPES,
+    CLIP_SOURCES,
+    CLIP_WHENS,
+    DEFAULT_BUDGET_CLIPS,
+    CONF_FACE_TEACH_CAMERAS,
+    CONF_SMART_AI,
+    CONF_PHONE_BUTTONS,
+    CONF_PHONE_APPS,
+    PHONE_BUTTON_KINDS,
+    CONF_BINS_CHECK,
+    CONF_BINS_SPOT,
+    DEFAULT_BINS_SPOT,
+    CONF_BINS_CALENDAR,
+    CONF_BINS_TIME,
+    DEFAULT_BINS_TIME,
+    CONF_BATTERY_FORECAST,
+    CONF_AUTO_BACKUP,
+    CONF_BACKUP_KEEP,
+    DEFAULT_BACKUP_KEEP,
+    CONF_SELF_TEST,
+    SELF_TEST_MODES,
+    CONF_RAIN,
+    CONF_RAIN_ENTITIES,
+    CONF_HUTCH_CHECK,
+    CONF_HUTCH_SPOT,
+    DEFAULT_HUTCH_SPOT,
+    CONF_CAT_WATCH,
+    CONF_CAT_SENSORS,
+    CONF_CAT_LOUD,
+    CONF_CONFIRM,
+    CONFIRM_KINDS,
+    CONF_STYLE_NOTES,
     DEFAULT_PERSONALITY,
     PERSONALITIES,
     CONF_WARM_BY_WEEKDAYS,
@@ -165,6 +220,14 @@ from .const import (
     CONF_PASS_THROUGH_AREAS,
     CONF_PERSONA,
     CONF_PROMPT_MEMORIES,
+    CONF_PROMPT_RECENT,
+    CONF_LOOK_CACHE,
+    DEFAULT_LOOK_CACHE,
+    CONF_CAMERA_PREFILTER,
+    CONF_BUDGET_DRIVE,
+    CONF_BUDGET_NOTICING,
+    CONF_BUDGET_CAMERAS,
+    CONF_ROUTINE_EVIDENCE,
     CONF_QUIET_END,
     CONF_QUIET_START,
     CONF_SPEAKERS,
@@ -196,6 +259,11 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Optional(CONF_DEFAULT_SPEAKER, **d(CONF_DEFAULT_SPEAKER)): _ONE_SPEAKER,
             vol.Optional(CONF_FALLBACK_SPEAKERS, **d(CONF_FALLBACK_SPEAKERS, [])): _SPEAKER,
             vol.Required(CONF_SIDEBAR, **d(CONF_SIDEBAR, DEFAULT_SIDEBAR)): selector.BooleanSelector(),
+            vol.Required(CONF_SUGGESTIONS, **d(CONF_SUGGESTIONS, True)): selector.BooleanSelector(),
+            vol.Required(CONF_AUTO_BACKUP, **d(CONF_AUTO_BACKUP, False)): selector.BooleanSelector(),
+            vol.Required(CONF_BACKUP_KEEP, **d(CONF_BACKUP_KEEP, DEFAULT_BACKUP_KEEP)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=20, step=1, mode=selector.NumberSelectorMode.BOX)
+            ),
             vol.Optional(CONF_VOICE_AGENT, **d(CONF_VOICE_AGENT)): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="conversation")
             ),
@@ -213,6 +281,20 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
             ),
             vol.Required(CONF_ANIMAL_HIGH, **d(CONF_ANIMAL_HIGH, DEFAULT_ANIMAL_HIGH)): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=15, max=45, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_HUTCH_CHECK, **d(CONF_HUTCH_CHECK, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_HUTCH_SPOT, **d(CONF_HUTCH_SPOT, DEFAULT_HUTCH_SPOT)): selector.TextSelector(),
+            vol.Required(CONF_CAT_WATCH, **d(CONF_CAT_WATCH, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_CAT_SENSORS, **d(CONF_CAT_SENSORS, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+            ),
+            vol.Required(CONF_CAT_LOUD, **d(CONF_CAT_LOUD, False)): selector.BooleanSelector(),
+            vol.Required(CONF_RAIN, **d(CONF_RAIN, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_RAIN_ENTITIES, **d(CONF_RAIN_ENTITIES, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+            ),
+            vol.Required(CONF_SELF_TEST, **d(CONF_SELF_TEST, "off")): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=SELF_TEST_MODES, translation_key="self_test")
             ),
             vol.Required(CONF_AWAY_LIGHTS_ON, **d(CONF_AWAY_LIGHTS_ON, False)): selector.BooleanSelector(),
             vol.Optional(CONF_AWAY_PEOPLE, **d(CONF_AWAY_PEOPLE, [])): selector.EntitySelector(
@@ -278,6 +360,9 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Required(CONF_DRIVE_SPOT, **d(CONF_DRIVE_SPOT, DEFAULT_DRIVE_SPOT)): selector.TextSelector(),
             vol.Optional(CONF_DRIVE_TRIGGERS, **d(CONF_DRIVE_TRIGGERS, [])): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+            ),
+            vol.Optional(CONF_KNOWN_CARS, **d(CONF_KNOWN_CARS, "")): selector.TextSelector(
+                selector.TextSelectorConfig(multiline=True)
             ),
             vol.Required(CONF_CRITICAL, **d(CONF_CRITICAL, True)): selector.BooleanSelector(),
             vol.Required(CONF_LEFT_OPEN_MINUTES, **d(CONF_LEFT_OPEN_MINUTES, 0)): selector.NumberSelector(
@@ -379,6 +464,10 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Optional(CONF_PERSONALITY_NOTES, **d(CONF_PERSONALITY_NOTES, "")): selector.TextSelector(
                 selector.TextSelectorConfig(multiline=True)
             ),
+            vol.Required(CONF_STYLE_FEEDBACK, **d(CONF_STYLE_FEEDBACK, True)): selector.BooleanSelector(),
+            vol.Optional(CONF_STYLE_NOTES, **d(CONF_STYLE_NOTES, "")): selector.TextSelector(
+                selector.TextSelectorConfig(multiline=True)
+            ),
             vol.Required(CONF_CHATTINESS, **d(CONF_CHATTINESS, DEFAULT_CHATTINESS)): selector.SelectSelector(
                 selector.SelectSelectorConfig(options=list(CHATTINESS_LIMITS), translation_key="chattiness")
             ),
@@ -406,6 +495,47 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
                 selector.EntitySelectorConfig(domain=["sensor", "input_text", "text", "image"])
             ),
             vol.Required(CONF_ANNOUNCE_VISITORS, **d(CONF_ANNOUNCE_VISITORS, DEFAULT_ANNOUNCE_VISITORS)): selector.BooleanSelector(),
+            vol.Required(CONF_FACES, **d(CONF_FACES, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_FACE_PEOPLE, **d(CONF_FACE_PEOPLE, [])): selector.TextSelector(
+                selector.TextSelectorConfig(multiple=True)
+            ),
+            vol.Required(CONF_FACE_TEACH, **d(CONF_FACE_TEACH, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_FACE_TEACH_CAMERAS, **d(CONF_FACE_TEACH_CAMERAS, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="camera", multiple=True)
+            ),
+            vol.Optional(CONF_FACE_CAMERAS, **d(CONF_FACE_CAMERAS, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="camera", multiple=True)
+            ),
+            vol.Required(CONF_FACE_FORGET_HOURS, **d(CONF_FACE_FORGET_HOURS, 0)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=720, step=1, unit_of_measurement="h", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_CLIP_WATCH, **d(CONF_CLIP_WATCH, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_CLIP_CAMERAS, **d(CONF_CLIP_CAMERAS, [])): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="camera", multiple=True)
+            ),
+            vol.Required(CONF_CLIP_SCOPE, **d(CONF_CLIP_SCOPE, CLIP_SCOPES[0])): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=CLIP_SCOPES, translation_key="clip_scope")
+            ),
+            vol.Required(CONF_CLIP_WHEN, **d(CONF_CLIP_WHEN, CLIP_WHENS[0])): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=CLIP_WHENS, translation_key="clip_when")
+            ),
+            vol.Required(CONF_CLIP_NOTIFY, **d(CONF_CLIP_NOTIFY, CLIP_NOTIFY_MODES[0])): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=CLIP_NOTIFY_MODES, translation_key="clip_notify")
+            ),
+            vol.Required(CONF_CLIP_SOURCE, **d(CONF_CLIP_SOURCE, CLIP_SOURCES[0])): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=CLIP_SOURCES, translation_key="clip_source")
+            ),
+            vol.Required(CONF_CLIP_WHOSE, **d(CONF_CLIP_WHOSE, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_CLIP_LOOKS, **d(CONF_CLIP_LOOKS, "")): selector.TextSelector(
+                selector.TextSelectorConfig(multiline=True)
+            ),
+            vol.Required(CONF_BUDGET_CLIPS, **d(CONF_BUDGET_CLIPS, DEFAULT_BUDGET_CLIPS)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=500, step=1, mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_CLIP_DAYS, **d(CONF_CLIP_DAYS, 7)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=60, step=1, unit_of_measurement="days", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_CLIP_KEEP, **d(CONF_CLIP_KEEP, False)): selector.BooleanSelector(),
             vol.Required(CONF_PARCEL_ALERTS, **d(CONF_PARCEL_ALERTS, DEFAULT_PARCEL_ALERTS)): selector.BooleanSelector(),
             vol.Optional(CONF_DOORSTEP_SENSORS, **d(CONF_DOORSTEP_SENSORS, [])): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
@@ -413,6 +543,7 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Required(CONF_BATTERY_THRESHOLD, **d(CONF_BATTERY_THRESHOLD, DEFAULT_BATTERY_THRESHOLD)): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=0, max=100, step=5, unit_of_measurement="%", mode=selector.NumberSelectorMode.BOX)
             ),
+            vol.Required(CONF_BATTERY_FORECAST, **d(CONF_BATTERY_FORECAST, True)): selector.BooleanSelector(),
             vol.Optional(CONF_HEALTH_IGNORE, **d(CONF_HEALTH_IGNORE, [])): selector.EntitySelector(
                 selector.EntitySelectorConfig(multiple=True)
             ),
@@ -424,12 +555,30 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
                     options=NOTIFY_KINDS, multiple=True, mode=selector.SelectSelectorMode.LIST, translation_key="notify_when"
                 )
             ),
+            vol.Optional(CONF_PHONE_BUTTONS, **d(CONF_PHONE_BUTTONS, [])): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=PHONE_BUTTON_KINDS, multiple=True, mode=selector.SelectSelectorMode.LIST, translation_key="phone_buttons"
+                )
+            ),
+            vol.Optional(CONF_PHONE_APPS, **d(CONF_PHONE_APPS, [])): selector.TextSelector(
+                selector.TextSelectorConfig(multiple=True)
+            ),
+            vol.Required(CONF_BINS_CHECK, **d(CONF_BINS_CHECK, False)): selector.BooleanSelector(),
+            vol.Optional(CONF_BINS_CALENDAR, **d(CONF_BINS_CALENDAR)): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="calendar")
+            ),
+            vol.Optional(CONF_BINS_SPOT, **d(CONF_BINS_SPOT, DEFAULT_BINS_SPOT)): selector.TextSelector(),
+            vol.Required(CONF_BINS_TIME, **d(CONF_BINS_TIME, DEFAULT_BINS_TIME)): selector.TimeSelector(),
             vol.Optional(CONF_AI_TASK_ENTITY, **d(CONF_AI_TASK_ENTITY)): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="ai_task")
             ),
             vol.Optional(CONF_SECOND_OPINION, **d(CONF_SECOND_OPINION)): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="ai_task")
             ),
+            vol.Optional(CONF_SMART_AI, **d(CONF_SMART_AI)): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="ai_task")
+            ),
+            vol.Required(CONF_EVENT_CLIPS, **d(CONF_EVENT_CLIPS, False)): selector.BooleanSelector(),
             vol.Required(CONF_CAMERA_COOLDOWN, **d(CONF_CAMERA_COOLDOWN, DEFAULT_CAMERA_COOLDOWN)): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=10, max=3600, step=10, unit_of_measurement="s", mode=selector.NumberSelectorMode.BOX)
             ),
@@ -439,6 +588,27 @@ def _speech_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Required(CONF_PROMPT_MEMORIES, **d(CONF_PROMPT_MEMORIES, DEFAULT_PROMPT_MEMORIES)): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=0, max=100, step=1, mode=selector.NumberSelectorMode.BOX)
             ),
+            vol.Required(CONF_PROMPT_RECENT, **d(CONF_PROMPT_RECENT, True)): selector.BooleanSelector(),
+            vol.Required(CONF_RULES, **d(CONF_RULES, False)): selector.BooleanSelector(),
+            vol.Required(CONF_RELEVANT_MEMORIES, **d(CONF_RELEVANT_MEMORIES, True)): selector.BooleanSelector(),
+            vol.Optional(CONF_CONFIRM, **d(CONF_CONFIRM, [])): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=list(CONFIRM_KINDS), multiple=True,
+                                              mode=selector.SelectSelectorMode.LIST, translation_key="confirm_kinds")
+            ),
+            vol.Required(CONF_LOOK_CACHE, **d(CONF_LOOK_CACHE, DEFAULT_LOOK_CACHE)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=30, step=1, unit_of_measurement="min", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_CAMERA_PREFILTER, **d(CONF_CAMERA_PREFILTER, True)): selector.BooleanSelector(),
+            vol.Required(CONF_BUDGET_DRIVE, **d(CONF_BUDGET_DRIVE, 0)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=500, step=1, mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_BUDGET_NOTICING, **d(CONF_BUDGET_NOTICING, 0)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=500, step=1, mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_BUDGET_CAMERAS, **d(CONF_BUDGET_CAMERAS, 0)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=500, step=1, mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_ROUTINE_EVIDENCE, **d(CONF_ROUTINE_EVIDENCE, True)): selector.BooleanSelector(),
         }
     )
 

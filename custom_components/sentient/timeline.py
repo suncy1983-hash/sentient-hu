@@ -35,7 +35,7 @@ from .presence import area_of
 STORAGE_VERSION = 1
 KEEP = 400
 EVENT_TIMELINE = f"{DOMAIN}_timeline"
-KINDS = ["said", "held", "noticed", "visitor", "watch", "light", "health", "mode", "digest", "critical", "energy", "security", "mind", "loop", "drive", "appliance", "animal", "voice"]
+KINDS = ["said", "held", "noticed", "visitor", "watch", "light", "health", "mode", "digest", "critical", "energy", "security", "mind", "loop", "drive", "appliance", "animal", "voice", "clip"]
 
 
 class Timeline:
@@ -139,7 +139,7 @@ class Timeline:
     @callback
     def _watch(self, event: Event) -> None:
         d = event.data
-        self.add("watch", d.get("message") or d.get("what", ""), d.get("what"))
+        self.add("watch", d.get("message") or d.get("what", ""), d.get("what"), reminder=True if d.get("kind") == "reminder" else None)
 
     @callback
     def _light(self, event: Event) -> None:

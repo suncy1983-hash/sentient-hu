@@ -120,6 +120,73 @@ CONF_BACKUP_AGENT = "backup_agent"
 DEFAULT_BACKUP_AGENT = "conversation.home_assistant"
 CONF_ANIMAL_SENSORS = "animal_sensors"
 CONF_AWAY_LIGHTS_ON = "away_lights_on"
+CONF_LOOK_CACHE = "look_cache_minutes"  # reuse a camera answer to the same question for this long (0 = never)
+DEFAULT_LOOK_CACHE = 3
+CONF_CAMERA_PREFILTER = "camera_prefilter"  # skip camera checks and watches when the picture hasn't changed
+CONF_BUDGET_DRIVE = "budget_drive"  # per-feature daily AI caps; 0 = share the overall limit
+CONF_BUDGET_NOTICING = "budget_noticing"
+CONF_BUDGET_CAMERAS = "budget_cameras"
+CONF_ROUTINE_EVIDENCE = "routine_evidence"  # routine offers say how often it's been seen
+CONF_SUGGESTIONS = "suggestions"  # the Sentient page offers things it could use
+CONF_CONFIRM = "confirm_kinds"  # the voice asks "shall I?" before these; empty = never
+CONFIRM_KINDS = {
+    "locks": "unlock or lock a door",
+    "garage": "open or close a garage door or gate",
+    "covers": "open or close blinds, curtains or shutters",
+    "heating": "turn the heating up by more than 2 degrees or set it above 22",
+    "appliances": "start an appliance (washing machine, dishwasher, dryer, vacuum)",
+}
+CONF_SELF_TEST = "self_test"  # off / nightly / weekly
+SELF_TEST_MODES = ["off", "nightly", "weekly"]
+CLIP_SCOPES = ["alerts", "zones", "all"]
+CLIP_WHENS = ["always", "quiet", "away", "quiet_or_away"]
+CLIP_NOTIFY_MODES = ["off", "worth", "suspicious", "all"]
+CLIP_SOURCES = ["sentient", "frigate"]
+CONF_RAIN = "rain_warnings"
+CONF_RAIN_ENTITIES = "rain_entities"
+CONF_HUTCH_CHECK = "hutch_check"
+CONF_HUTCH_SPOT = "hutch_spot"
+DEFAULT_HUTCH_SPOT = "rabbit pen"
+CONF_CAT_WATCH = "cat_watch"
+CONF_CAT_SENSORS = "cat_sensors"
+CONF_CAT_LOUD = "cat_loud"
+CONF_AUTO_BACKUP = "auto_backup"
+CONF_BACKUP_KEEP = "backup_keep"
+DEFAULT_BACKUP_KEEP = 4
+CONF_BATTERY_FORECAST = "battery_forecast"  # when batteries will run out, in the weekly report
+CONF_BINS_CHECK = "bins_check"
+CONF_BINS_SPOT = "bins_spot"
+DEFAULT_BINS_SPOT = "bins"
+CONF_BINS_CALENDAR = "bins_calendar"
+CONF_BINS_TIME = "bins_time"
+DEFAULT_BINS_TIME = "19:00:00"
+CONF_PHONE_BUTTONS = "phone_buttons"  # which notifications get buttons: door, reminders
+PHONE_BUTTON_KINDS = ["door", "reminders"]
+CONF_PHONE_APPS = "phone_apps"  # the companion app's notify actions (notify.mobile_app_…) that can show buttons
+CONF_SMART_AI = "smart_ai_task"  # optional stronger AI for camera security and the overnight think; empty = the usual one
+CONF_FACES = "faces"  # names from face recognition (Frigate, doorbells); private, only when asked
+CONF_FACE_PEOPLE = "face_people"
+CONF_FACE_TEACH = "face_teach"  # ask on the phone who an unnamed face was, and teach Frigate
+CONF_FACE_TEACH_CAMERAS = "face_teach_cameras"
+CONF_FACE_CAMERAS = "face_cameras"  # only names from these cameras count (empty: all)
+CONF_FACE_FORGET_HOURS = "face_forget_hours"  # delete unnamed faces in Frigate after this many hours (0: leave to Frigate)
+CONF_CLIP_WATCH = "clip_watch"  # watch Frigate's clips on chosen cameras and write down what happened
+CONF_CLIP_CAMERAS = "clip_cameras"
+CONF_CLIP_SCOPE = "clip_scope"  # alerts / zones / all
+CONF_CLIP_WHEN = "clip_when"  # always / quiet / away / quiet_or_away
+CONF_CLIP_NOTIFY = "clip_notify"  # off / worth / suspicious / all
+CONF_CLIP_SOURCE = "clip_source"  # sentient / frigate
+CONF_CLIP_WHOSE = "clip_whose"  # compare with the household's face photos in the same call
+CONF_CLIP_LOOKS = "clip_looks"  # "Alex: motorbike helmet and riding jacket" — for when a face can't be seen
+CONF_CLIP_DAYS = "clip_days"
+CONF_CLIP_KEEP = "clip_keep"
+CONF_BUDGET_CLIPS = "budget_clips"
+DEFAULT_BUDGET_CLIPS = 30
+CONF_RULES = "rules"  # "when this, do that" rules, and making them by voice
+CONF_RELEVANT_MEMORIES = "relevant_memories"  # pick memories that match what was asked, not just the newest
+CONF_KNOWN_CARS = "known_cars"  # "Sam: dark grey hatchback", one per line; empty = cars aren't named
+CONF_EVENT_CLIPS = "event_clips"  # watch Frigate's clip of an event, not just a still
+CONF_PROMPT_RECENT = "prompt_recent"  # the last hour and busy rooms in the voice's context
 CONF_AWAY_PEOPLE = "away_people"
 CONF_AWAY_LIGHTS = "away_lights"
 CONF_AWAY_AFTER = "away_after"
@@ -180,6 +247,9 @@ DEFAULT_WEEKLY_REPORT = True
 # personality
 CONF_PERSONALITY = "personality"
 CONF_PERSONALITY_NOTES = "personality_notes"
+CONF_STYLE_FEEDBACK = "style_feedback"  # "say it differently" on things it said
+CONF_STYLE_NOTES = "style_notes"  # how people want things said, one per line
+MAX_STYLE_NOTES = 8
 DEFAULT_PERSONALITY = "calm"
 PERSONALITIES = {
     "calm": "calm, warm and to the point",
@@ -194,7 +264,11 @@ def personality_line(options: dict) -> str:
     """One sentence about how the house should sound, for every prompt."""
     style = PERSONALITIES.get(options.get(CONF_PERSONALITY) or DEFAULT_PERSONALITY, PERSONALITIES[DEFAULT_PERSONALITY])
     notes = (options.get(CONF_PERSONALITY_NOTES) or "").strip()
-    return f"Your personality: {style}." + (f" {notes}" if notes else "")
+    line = f"Your personality: {style}." + (f" {notes}" if notes else "")
+    said = [n.strip() for n in str(options.get(CONF_STYLE_NOTES) or "").splitlines() if n.strip()]
+    if said and options.get(CONF_STYLE_FEEDBACK, True):
+        line += " How the household has asked for things to be said: " + "; ".join(said[-MAX_STYLE_NOTES:]) + "."
+    return line
 
 # camera security
 CONF_CAMSEC = "camera_security"

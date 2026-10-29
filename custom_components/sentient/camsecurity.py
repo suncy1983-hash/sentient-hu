@@ -30,6 +30,7 @@ from . import i18n
 from .ai import ai_task_entity, async_generate
 from .i18n import t as tr
 from .const import (
+    CONF_SMART_AI,
     CONF_CAMSEC,
     CONF_CAMSEC_DESCRIBE,
     CONF_CAMSEC_ENTRIES,
@@ -216,6 +217,8 @@ class CameraSecurity:
                 rt.timeline.add("noticed", tr("camsec.nobody", text=text, time=f"{local:%H:%M}"),
                                 "camera security: probably a false alarm")
                 return
+        if camera and getattr(rt, "clips", None) is not None and rt.clips.enabled:
+            self.hass.async_create_background_task(rt.clips.async_after_alert(camera, text), "sentient_clip")
         rt.timeline.add("security", f"{text} ({local:%H:%M})." + (f" {detail}" if detail else ""), "camera security", alert=True)
         if rt.speech.quiet_hours_now() and self.options.get(CONF_NIGHT_WATCH_ANNOUNCE):
             speakers = [s for s in self.options.get(CONF_NIGHT_WATCH_SPEAKERS) or [] if self.hass.states.get(s)] or None
@@ -238,7 +241,7 @@ class CameraSecurity:
             },
             "attachments": [{"media_content_id": f"media-source://camera/{camera}", "media_content_type": "image/jpeg"}],
         }
-        if ai := ai_task_entity(self.hass, self.options):
+        if ai := self.options.get(CONF_SMART_AI) or ai_task_entity(self.hass, self.options):
             data["entity_id"] = ai
         try:
             response = await async_generate(self.hass, data)

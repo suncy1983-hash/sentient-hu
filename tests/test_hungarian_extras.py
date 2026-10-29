@@ -40,3 +40,26 @@ def test_bedtime_routine_names_in_hungarian() -> None:
     assert sleep.is_bedtime_routine("Jó éjt")
     assert sleep.is_bedtime_routine("Éjszakai mód")
     assert not sleep.is_bedtime_routine("Reggeli kávé")
+
+
+def test_spoken_time_in_hungarian() -> None:
+    from datetime import datetime
+
+    from custom_components.sentient.llm_api import clock_words
+
+    i18n.set_language("hu")
+    try:
+        assert clock_words(datetime(2026, 10, 29, 9, 5)) == "9 óra 5 perc"
+        assert clock_words(datetime(2026, 10, 29, 15, 0)) == "15 óra"
+    finally:
+        i18n.set_language("en")
+    assert clock_words(datetime(2026, 10, 29, 9, 5)) == "nine oh five"
+
+
+def test_phone_buttons_skip_a_switched_off_phone(hass) -> None:
+    from custom_components.sentient.notifier import Notifier
+
+    n = Notifier(hass, {"notify_targets": ["notify.sanya", "notify.kata_2"], "phone_buttons": ["door"]})
+    n.buttons = lambda kind: ["mobile_app_sanya", "mobile_app_kata"]
+    apps, _ = n._with_buttons("door", {}, ["notify.sanya"])  # Kata's phone switched off (or she's home)
+    assert apps == ["mobile_app_sanya"]

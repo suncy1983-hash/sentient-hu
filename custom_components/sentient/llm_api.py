@@ -26,6 +26,10 @@ from homeassistant.util.json import JsonObjectType
 
 from .const import (
     CONF_FALLBACK_SPEAKERS,
+    CONF_RELEVANT_MEMORIES,
+    CONF_CONFIRM,
+    CONFIRM_KINDS,
+    CONF_PROMPT_RECENT,
     CONF_BRIEFING_WEATHER,
     personality_line,
     CONF_HOUSE_RULES,
@@ -53,6 +57,36 @@ def _runtime(hass: HomeAssistant) -> SentientRuntime | None:
 
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _clips_on(hass: HomeAssistant) -> bool:
+    rt = _runtime(hass)
+    return rt is not None and bool(rt.options.get("event_clips", False) or rt.options.get("clip_watch", False))
+
+
+def _rules_on(hass: HomeAssistant) -> bool:
+    rt = _runtime(hass)
+    return rt is not None and bool(rt.options.get("rules", False))
+
+
+_ONES = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+         "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"]
+_TENS = {2: "twenty", 3: "thirty", 4: "forty", 5: "fifty"}
+
+
+def clock_words(when) -> str:
+    """11:49 -> "eleven forty-nine", 09:05 -> "nine oh five", 15:00 -> "three o'clock"; in Hungarian "11 óra 49 perc"."""
+    if i18n.is_hu():
+        return f"{when.hour} óra" + (f" {when.minute} perc" if when.minute else "")
+    hour = when.hour % 12 or 12
+    m = when.minute
+    if m == 0:
+        return f"{_ONES[hour]} o'clock"
+    if m < 10:
+        return f"{_ONES[hour]} oh {_ONES[m]}"
+    if m < 20:
+        return f"{_ONES[hour]} {_ONES[m]}"
+    return f"{_ONES[hour]} {_TENS[m // 10]}" + (f"-{_ONES[m % 10]}" if m % 10 else "")
 
 
 class _Tool(llm.Tool):
@@ -186,6 +220,10 @@ class ForgetTool(_Tool):
         return {"forgotten": removed.text if removed else None}
 
 
+STOPWORDS = {"the", "and", "you", "what", "who", "how", "when", "where", "why", "are", "was", "has", "have", "with", "that",
+             "this", "for", "can", "does", "did", "there", "they", "them", "our", "your", "tell", "please", "about", "any",
+             "anything", "today", "now", "right", "just", "get", "got", "his", "her", "its", "into", "from", "out", "off"}
+RECENT_SKIP = {"held", "digest", "mind", "loop", "learned"}
 EVERYWHERE = re.compile(r"(the )?(everywhere|every ?(one|body|room|speaker)s?|all( the)?( (speakers|rooms))?|(the )?whole house|all over( the house)?|house)")
 
 
@@ -537,7 +575,7 @@ class FacesTool(_Tool):
         if rt is None:
             return {"error": "Sentient is not loaded"}
         try:
-            return {"faces": await rt.faces.async_people()}
+            return {"faces": await rt.faceid.async_people()}
         except HomeAssistantError as err:
             return {"error": str(err)}
 
@@ -554,7 +592,7 @@ class ForgetFaceTool(_Tool):
         if rt is None:
             return {"error": "Sentient is not loaded"}
         try:
-            return {"forgotten": await rt.faces.async_forget(tool_input.tool_args["name"])}
+            return {"forgotten": await rt.faceid.async_forget(tool_input.tool_args["name"])}
         except HomeAssistantError as err:
             return {"error": str(err)}
 
@@ -587,6 +625,112 @@ class CancelWatchTool(_Tool):
             return {"error": "Sentient is not loaded"}
         removed = rt.watches.cancel(tool_input.tool_args["what"])
         return {"cancelled": removed.what if removed else None}
+
+
+class RuleTool(_Tool):
+    name = "sentient_make_rule"
+    description = (
+        "Make (or remove) a standing rule: 'when <something> <becomes on/opens/off/home>, <do something>', with "
+        "optional conditions — e.g. 'when the back door opens after dark, put the kitchen light on at 30%'. "
+        "First call with confirmed false: you get the rule back in plain words — read it back exactly and ask "
+        "'shall I set that up?'. Only after a clear yes, call again with the same details and confirmed true. "
+        "'do' is a list of actions like {action: 'light.turn_on', target: 'kitchen light', brightness_pct: 30}. "
+        "To delete one, give its name and remove true. Rules can never arm, disarm or unlock anything."
+    )
+    parameters = vol.Schema({
+        vol.Required("name"): cv.string,
+        vol.Optional("when"): cv.string,
+        vol.Optional("becomes"): cv.string,
+        vol.Optional("after_dark"): cv.boolean,
+        vol.Optional("between"): cv.string,
+        vol.Optional("only_if"): cv.string,
+        vol.Optional("only_if_is"): cv.string,
+        vol.Optional("do"): [vol.Schema({
+            vol.Required("action"): cv.string,
+            vol.Required("target"): cv.string,
+            vol.Optional("brightness_pct"): vol.Coerce(int),
+            vol.Optional("temperature"): vol.Coerce(float),
+        })],
+        vol.Optional("say"): cv.string,
+        vol.Optional("confirmed", default=False): cv.boolean,
+        vol.Optional("remove", default=False): cv.boolean,
+    })
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        from .rules import describe, safe_actions, state_word
+        from .watches import resolve_entity
+
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        args = tool_input.tool_args
+        items = rt.lists["rules"]
+        if args.get("remove"):
+            found = items.find(args["name"])
+            if found is None:
+                return {"error": f"no rule called '{args['name']}'", "rules": [r["name"] for r in items.listing()]}
+            if not args.get("confirmed"):
+                return {"read_back": f"Delete the rule '{found['name']}': {describe(hass, found)}",
+                        "next": "Ask if they're sure; only after a yes, call again with remove true and confirmed true."}
+            items.remove(found["id"])
+            return {"removed": found["name"]}
+        when = resolve_entity(hass, args.get("when") or "")
+        if when is None:
+            return {"error": f"I can't find '{args.get('when')}' — ask which device they mean"}
+        actions = []
+        for a in args.get("do") or []:
+            domain = a["action"].split(".", 1)[0]
+            target = resolve_entity(hass, a["target"], domain) or resolve_entity(hass, a["target"])
+            if target is None:
+                return {"error": f"I can't find '{a['target']}' — ask which device they mean"}
+            data = {k: a[k] for k in ("brightness_pct", "temperature") if k in a}
+            actions.append({"action": a["action"], "target": {"entity_id": target}, **({"data": data} if data else {})})
+        if not actions and not args.get("say"):
+            return {"error": "the rule needs something to do or say"}
+        if why := safe_actions(actions):
+            return {"error": why, "say": "Say plainly that rules can't do that."}
+        item = {
+            "name": args["name"], "enabled": True, "when_entity": when, "when_to": state_word(args.get("becomes") or "on"),
+            "after_dark": bool(args.get("after_dark")), "times": args.get("between") or "",
+            "only_if": resolve_entity(hass, args["only_if"]) if args.get("only_if") else None,
+            "only_if_state": state_word(args.get("only_if_is") or "") if args.get("only_if") else "",
+            "actions": actions, "say": args.get("say") or "", "made_by": "voice",
+        }
+        text = describe(hass, item)
+        if not args.get("confirmed"):
+            return {"read_back": text, "next": "Read this back and ask 'shall I set that up?'. Only after a clear "
+                                               "yes, call sentient_make_rule again with exactly the same details and confirmed true."}
+        existing = items.find(args["name"])
+        if existing:
+            item["id"] = existing["id"]
+        items.upsert(item)
+        rt.timeline.add("mode", f"New rule: {args['name']}", text)
+        return {"made": text}
+
+
+class WhatHappenedTool(_Tool):
+    name = "sentient_what_happened"
+    description = (
+        "Watch the latest recorded clip from a camera and say what actually happened — for 'what happened at the "
+        "door?', 'what was that in the garden?', 'who was at the gate just now?'. 'camera' is the camera's name or "
+        "area. Uses the event clip, not a live picture; for what's there right now, use sentient_look."
+    )
+    parameters = vol.Schema({vol.Required("camera"): cv.string, vol.Optional("question"): cv.string})
+
+    async def async_call(
+        self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
+    ) -> JsonObjectType:
+        from .watches import resolve_entity
+
+        rt = _runtime(hass)
+        if rt is None:
+            return {"error": "Sentient is not loaded"}
+        camera = resolve_entity(hass, tool_input.tool_args["camera"], "camera")
+        if camera is None or not camera.startswith("camera."):
+            return {"error": f"no camera called '{tool_input.tool_args['camera']}'"}
+        return await rt.clips.async_what_happened(camera, tool_input.tool_args.get("question"), force=True)
 
 
 class LookTool(_Tool):
@@ -1288,6 +1432,8 @@ class HouseCheckTool(_Tool):
             pass
         if animals := rt.animals.readings():
             out["animals_outside"] = animals
+        if rt.options.get("battery_forecast", True) and (batteries := rt.watchdog.battery_forecasts(30)):
+            out["batteries_running_out"] = [b["text"] for b in batteries[:5]]
         if running := [a for a in rt.appliances.listing() if a["running"]]:
             out["appliances_running"] = [f"{a['name']} since {a['started']}" + (f", done about {a['done_about']}" if a.get("done_about") else "")
                                          for a in running]
@@ -1328,7 +1474,7 @@ class SentientAPI(llm.API):
             llm_context=llm_context,
             tools=[RememberTool(), CorrectionTool(), HouseCheckTool(), RecallTool(), ForgetTool(), AnnounceTool(),
                    WatchTool(), RemindTool(), ListWatchesTool(), CancelWatchTool(), LookTool(),
-                   RoutinesTool(), AdoptRoutineTool(), ForgetRoutineTool(), AcceptOfferTool(), AlarmTool(), PartyTool(), HeatingTool(), NightWatchTool(), WeeklyTool(), BriefingTool(), VisitorsTool(), SpotTool(), MotionLightsTool(), TimelineTool(), QuietTool(), ShushTool(), RunRoutineTool(), EnergyTool(), SecurityTool(), ScenesTool(), FollowUpTool(), ConversationsTool(), WhyTool(), CalendarEventTool()]
+                   RoutinesTool(), AdoptRoutineTool(), ForgetRoutineTool(), *([RuleTool()] if _rules_on(self.hass) else []), *([WhatHappenedTool()] if _clips_on(self.hass) else []), AcceptOfferTool(), AlarmTool(), PartyTool(), HeatingTool(), NightWatchTool(), WeeklyTool(), BriefingTool(), VisitorsTool(), SpotTool(), MotionLightsTool(), TimelineTool(), QuietTool(), ShushTool(), RunRoutineTool(), EnergyTool(), SecurityTool(), ScenesTool(), FollowUpTool(), ConversationsTool(), WhyTool(), CalendarEventTool()]
                   + ([LearnVoiceTool(), VoicesTool(), ForgetVoiceTool(), LearnFaceTool(), FacesTool(), ForgetFaceTool()]
                      if self._voice_on() else []),
         )
@@ -1377,7 +1523,8 @@ class SentientAPI(llm.API):
             f"You are {persona}, the brain of this home. The same memory is shared by "
             "every voice and automation in the house.",
             personality_line(opts),
-            f"Local time: {dt_util.now().strftime('%A %d %B %Y, %H:%M')}.",
+            f"Local time: {dt_util.now().strftime('%A %d %B %Y, %H:%M')} — if asked the time, say this exact "
+            f"time (\"{clock_words(dt_util.now())}\"); never round or estimate it.",
         ]
         weather_id = opts.get(CONF_BRIEFING_WEATHER)
         weather = self.hass.states.get(weather_id) if weather_id else next(
@@ -1401,6 +1548,14 @@ class SentientAPI(llm.API):
         if room:
             lines.append(f"The person talking to you is in the {room}.")
         lines.extend(self._speaker_lines(rt))
+        if opts.get(CONF_PROMPT_RECENT, True):
+            lines.extend(self._recent_lines(rt))
+        if confirm := [CONFIRM_KINDS[k] for k in opts.get(CONF_CONFIRM) or [] if k in CONFIRM_KINDS]:
+            lines.append(
+                "Ask first: before you " + "; or ".join(confirm) + ", say in a few words exactly what you're about "
+                "to do and ask \"shall I?\". Only do it after a clear yes in their reply; anything else, leave it. "
+                "Turning things off, stopping them or lowering the heating never needs asking."
+            )
         if rt.speech.guest_mode:
             lines.append(
                 "Guests are visiting: don't bring up personal household details, routines or memories "
@@ -1424,8 +1579,8 @@ class SentientAPI(llm.API):
         if lessons:
             lines.append("You've been corrected on these before — get them right first time:")
             lines.extend(f"- {m.text}" for m in lessons)
-        memories = [m for m in rt.memory.recent(int(opts.get(CONF_PROMPT_MEMORIES, DEFAULT_PROMPT_MEMORIES)) + len(lessons))
-                    if m.category != "correction"][: int(opts.get(CONF_PROMPT_MEMORIES, DEFAULT_PROMPT_MEMORIES))]
+        memories = self._memories(rt, int(opts.get(CONF_PROMPT_MEMORIES, DEFAULT_PROMPT_MEMORIES)),
+                                  bool(opts.get(CONF_RELEVANT_MEMORIES, True)))
         if memories:
             lines.append("Things you know about this household:")
             lines.extend(f"- {m.text}" for m in memories)
@@ -1438,6 +1593,8 @@ class SentientAPI(llm.API):
             lines.extend(talk)
         if drive := rt.drive.prompt_line():
             lines.append(drive)
+        if not rt.speech.guest_mode and (seen := rt.faces.prompt_line()):
+            lines.append(seen)
         if rt.loops.items:
             lines.append("Follow-ups you've set: " + "; ".join(f"{i['about']} at {i['at']}" for i in rt.loops.listing()[:6]) + ".")
         if spots := rt.spots.describe():
@@ -1507,6 +1664,48 @@ class SentientAPI(llm.API):
             + " when addressing people."
         )
         return "\n".join(lines)
+
+    @staticmethod
+    def _asked() -> str:
+        """What was just said to the voice (this turn's words are already in the chat log)."""
+        try:
+            from homeassistant.components.conversation.chat_log import current_chat_log
+
+            log = current_chat_log.get()
+            said = [c.content for c in (log.content if log else []) if getattr(c, "role", "") == "user" and c.content]
+            return " ".join(said[-2:])
+        except Exception:  # noqa: BLE001
+            return ""
+
+    def _memories(self, rt: Any, limit: int, relevant: bool) -> list[Any]:
+        """The newest memories — or, once there are more than fit, the ones that match what was asked plus the newest."""
+        everything = [m for m in rt.memory.items if m.category != "correction"]
+        newest = list(reversed(everything))
+        if not relevant or len(everything) <= limit or limit <= 0:
+            return [m for m in rt.memory.recent(limit + 20) if m.category != "correction"][:limit]
+        words = {w for w in re.findall(r"[a-z]{3,}", self._asked().lower()) if w not in STOPWORDS}
+        if not words:
+            return newest[:limit]
+        scored = sorted(((len(words & set(re.findall(r"[a-z]{3,}", m.text.lower()))), i, m) for i, m in enumerate(newest)),
+                        key=lambda t: (-t[0], t[1]))
+        matched = [m for score, _, m in scored if score > 0][: limit // 2]
+        rest = [m for m in newest if m not in matched][: limit - len(matched)]
+        return matched + rest
+
+    def _recent_lines(self, rt: Any) -> list[str]:
+        """The last hour at a glance, and where people seem to be — so 'what just happened?' needs no tool."""
+        out: list[str] = []
+        areas = ar.async_get(self.hass)
+        busy = [a.name for a_id in rt.tracker.occupied_areas() if (a := areas.async_get_area(a_id))]
+        if busy:  # nothing convincing: say nothing (never that the house is empty)
+            out.append("Movement lately in: " + ", ".join(busy[:4]) + ".")
+        recent = [i for i in rt.timeline.since(1, None, 30) if i["kind"] not in RECENT_SKIP][:5]
+        if recent:
+            out.append("In the last hour (newest first; sentient_timeline has more):")
+            for item in recent:
+                when = dt_util.parse_datetime(item["time"])
+                out.append(f"- {dt_util.as_local(when):%H:%M} {item['text']}" if when else f"- {item['text']}")
+        return out
 
     def _room_of_device(self, device_id: str | None) -> str | None:
         if not device_id:

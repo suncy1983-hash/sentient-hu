@@ -59,7 +59,48 @@
           "animal_high": "Túl meleg e fölött",
           "screen": "Tablet képernyő használata",
           "screen_actions": "Ha valami megjelenik",
-          "screen_clear_actions": "Ha minden eltűnt"
+          "screen_clear_actions": "Ha minden eltűnt",
+          "prompt_recent": "Az utolsó óra a hang kontextusában",
+          "rules": "Szabályok, hanggal is létrehozva",
+          "relevant_memories": "A kérdéshez illő emlékek kiválasztása",
+          "look_cache_minutes": "Kameraválasz újrahasználása ennyi ideig",
+          "camera_prefilter": "Kamerapillantás kihagyása, ha semmi sem változott",
+          "budget_drive": "Napi AI-hívások: behajtó",
+          "budget_noticing": "Napi AI-hívások: észrevételek",
+          "budget_cameras": "Napi AI-hívások: kameraellenőrzések és figyelések",
+          "routine_evidence": "Mondja meg, milyen gyakran látott egy rutint",
+          "faces": "Nevek arcfelismerésből",
+          "face_people": "Csak ezek az emberek",
+          "face_teach": "Kérdezze meg telefonon, kik az ismeretlen arcok",
+          "face_teach_cameras": "Arcok tanulása ezekről a kamerákról",
+          "face_cameras": "Nevek csak ezekről a kamerákról",
+          "face_forget_hours": "Névtelen arcok elfelejtése ennyi idő után",
+          "clip_watch": "Eseményklipek megnézése",
+          "clip_cameras": "Kamerák",
+          "clip_scope": "Mely események",
+          "clip_when": "Mikor",
+          "clip_notify": "Küldés a telefonokra",
+          "clip_source": "Ki írja az összefoglalót",
+          "clip_whose": "Mondja meg, melyik családtag volt",
+          "clip_looks": "Hogy néznek ki az emberek, ha nem látszik az arcuk",
+          "budget_clips": "Naponta megnézett klipek (legfeljebb)",
+          "clip_days": "Összefoglalók megőrzése",
+          "clip_keep": "Klipfájlok megtartása",
+          "suggestions": "Javaslatok a Sentient oldalon",
+          "auto_backup": "Heti biztonsági mentés",
+          "backup_keep": "Hányat őrizzen meg",
+          "confirm_kinds": "Kérdezze meg „Megcsináljam?” ezek előtt",
+          "battery_forecast": "Szóljon, mikor merülnek le az elemek",
+          "smart_ai_task": "Erősebb AI a biztonsághoz és az éjszakai átgondoláshoz",
+          "event_clips": "Frigate eseményklipek megnézése",
+          "hutch_check": "Alkonyati ólellenőrzés",
+          "hutch_spot": "Az ól kameraterülete",
+          "cat_watch": "Éjszakai macskafigyelés",
+          "cat_sensors": "Macskaérzékelők",
+          "cat_loud": "Éjjel azonnal szóljon",
+          "rain_warnings": "Esőfigyelmeztetés",
+          "rain_entities": "Figyelt ablakok és ajtók",
+          "self_test": "Önellenőrzés"
         },
         "data_description": {
           "motion_window": "Hány perc mozgáselőzményt vegyen figyelembe, amikor eldönti, hol vannak az emberek.",
@@ -100,7 +141,45 @@
           "animal_high": "Egyszer szól, ha e fölé emelkedik.",
           "screen": "Riasztások, értesítések és reggeli kártya a Sentient képernyő-kártyán (custom:sentient-screen-card). Kikapcsolva csak a ház áttekintését mutatja.",
           "screen_actions": "pl. a tablet felébresztése és a képernyő-kártyás oldalra váltás.",
-          "screen_clear_actions": "pl. a tablet visszaváltása a szokásos oldalára."
+          "screen_clear_actions": "pl. a tablet visszaváltása a szokásos oldalára.",
+          "prompt_recent": "Néhány sor arról, mi történt az utolsó órában és hol volt mozgás, így a „mi történt az előbb?” kérdésre azonnal tud felelni. Ingyenes: nincs plusz AI-hívás.",
+          "rules": "„Ha ez történik, csináld ezt” szabályok (a Szabályok oldal), és a hang is létrehozhatja őket: felolvassa a szabályt, és csak igen után menti. Szabály soha nem élesít, hatástalanít vagy nyit zárat. Kikapcsolva nem fut szabály.",
+          "relevant_memories": "Ha több emlék van, mint ami belefér a hang kontextusába, azokat kapja, amelyekben közös szavak vannak a kérdéssel, utána a legújabbakat. Ingyenes, AI nélkül. Kikapcsolva mindig a legújabbakat.",
+          "look_cache_minutes": "Ugyanarra a kérdésre ugyanannál a kameránál ennyi időn belül az előző választ adja új AI-pillantás helyett. 0: mindig újra néz.",
+          "camera_prefilter": "A kameraellenőrzések és figyelések előbb egy apró képet hasonlítanak össze (ezen a gépen, ingyen), és csak akkor kérdezik az AI-t, ha a kamera – vagy a területe – másképp néz ki, mint legutóbb.",
+          "budget_drive": "Saját napi keret az összkereten belül. 0: csak az összkeretet használja.",
+          "budget_noticing": "Saját napi keret az összkereten belül. 0: csak az összkeretet használja.",
+          "budget_cameras": "Saját napi keret az összkereten belül. 0: csak az összkeretet használja. A biztonság, a csengő és a feltett kérdések sosem várnak.",
+          "routine_evidence": "A rutin átvételét felajánló kérdés megmondja, milyen gyakran fordult elő, pl. „az utolsó 4 hétvégi napból 4”.",
+          "faces": "Ha a Frigate (vagy a csengő) felismer valakit, bekerül az idővonalba, és a hang tud felelni arra, hogy „hazaért Sanya?”. A neveket soha nem mondja be és nem találgatja – csak ha kérdezik. Alapból ki.",
+          "face_people": "A nevek, ahogy a Frigate ismeri őket. Üresen: mindenki, akit felismer.",
+          "face_teach": "Segít a Frigate arcfelismerésének fejlődni. Ha valaki elhagy egy kiválasztott kamerát, és a Frigate megtartott egy arcot, amit nem tudott megnevezni, a telefonok privát „Ki ez?” kérdést kapnak az arccal és a háztartás gombjaival (a telefonok legfeljebb hármat mutatnak). Egy gomb megnyomása megtanítja a Frigate-et; a „Valaki más…” alatt új nevet lehet beírni, vagy „nem”-et egy idegen arcának törléséhez. Soha nem hangzik el, soha nincs a tableteken, legfeljebb tízpercenként. Kell hozzá a Frigate arcfelismerés és értesítéshez kiválasztott telefonok. Alapból ki.",
+          "face_teach_cameras": "Közeli kamerák, ahol tisztán látszanak az arcok, pl. a csengő. Üresen: az ajtókamera.",
+          "face_cameras": "Üresen: minden kamera. Válaszd a közelieket (csengő, bejárati ajtó), hogy egy forgalmas utca ne adjon téves neveket.",
+          "face_forget_hours": "Minden éjjel a Frigate által megtartott, de senki által meg nem nevezett arcokat – többnyire idegenekét – törli a Frigate-ből, ha ennyi idősek. A megnevezett arcok megmaradnak. 0: a Frigate-re bízza (az utolsó 200-at tartja meg).",
+          "clip_watch": "Ha a Frigate befejez egy eseményt egy kiválasztott kamerán, az AI egyszer megnézi azt a felvételrészt, és egy mondat kerül az idővonalra és a Sentient oldalra: „Kapu 14:10 — egy férfi kutyát sétáltatott”. A hang ezekből felel arra, hogy „mi történt a kapunál?”, újabb AI-hívás nélkül. Soha nem hangzik el. Alapból ki.",
+          "clip_cameras": "Kezdd egyel, pl. a kapuval.",
+          "clip_scope": "A Frigate riasztásai a kötelezőnek jelölt zónákban lévő emberek – ez a legcsendesebb választás egy forgalmas utcánál.",
+          "clip_when": "Csak ezekben az időkben nézzen. Távol: mindenki, akit a Távolléti világításnál kiválasztottál, elment.",
+          "clip_notify": "Csak a telefonokra megy, képpel és lejátszás gombbal.",
+          "clip_source": "A Frigate saját AI-összefoglalóit a Frigate-ben kell bekapcsolni; ekkor itt nincs AI-hívás.",
+          "clip_whose": "Ugyanabban az AI-hívásban a háztartás arcképei a Frigate arckönyvtárából (és a lenti leírások) is mennek, és csak akkor nevez meg valakit, ha egyértelműen ő az – „valószínűleg Sanya”. Idegent soha nem nevez meg. Csak kérdésre mondja, sosem jelenti be.",
+          "clip_looks": "Soronként egy, pl. „Sanya: fekete motoros sisak és dzseki, motoron”. Segít, ha sisak vagy kapucni takarja az arcot.",
+          "budget_clips": "Ez is beleszámít a napi összes AI-keretbe. 0: nincs saját korlát.",
+          "clip_days": "Az összefoglalók csak szavak, utána törlődnek.",
+          "clip_keep": "Kikapcsolva minden klip törlődik, amint megnézte.",
+          "confirm_kinds": "A hang elmondja, mit fog csinálni, és igenre vár ezek előtt. A kikapcsolás sosem kér megerősítést. Üresen: egyszerűen megcsinálja. A riasztót hanggal semmiképp nem élesíti és nem hatástalanítja.",
+          "auto_backup": "Vasárnap éjjel mentés az emlékekről, területekről, rutinokról, mozgásérzékelős lámpákról, némításokról és a beállításokról, a config mappában, a sentient_backups alatt.",
+          "backup_keep": "A régebbiek törlődnek.",
+          "suggestions": "Dolgok, amiket a Sentient használhatna, de nem használ – egy új hangszóró, egy teljesítménymérő a mosógépen, egy ól-hőmérő –, soronként felajánlva. Igen: hozzáadja; nem: soha többé nem ajánlja. Ingyenes, AI nélkül.",
+          "hutch_check": "Fél órával napnyugta után egy AI-pillantás az ólra: bent vannak-e, és be van-e zárva? Csak akkor szól, ha nem.",
+          "hutch_spot": "Az ól köré rajzolt terület a Területek fülön, pl. „nyúlketrec”.",
+          "cat_watch": "Sötétedés után, ha az ól kameráján bekapcsol egy macskaérzékelő, egy AI-pillantás: van-e macska az ólnál? Legfeljebb 15 percenként, és nem, ha a kép nem változott.",
+          "cat_sensors": "Üresen: az ól kamerájának macskaérzékelői (pl. a Frigate macska-jelenléte).",
+          "cat_loud": "Kikapcsolva reggelre tartja („Hajnali 2:14-kor egy macska járt az ólnál”). Bekapcsolva azonnal elmondja az éjszakai őrség hangszóróin.",
+          "rain_warnings": "Ha egy órán belül eső várható, és nyitva van egy ablak vagy ajtó: „Egy órán belül eső jön, és nyitva van a hálószoba ablaka.” Az óránkénti előrejelzésből – AI nélkül. Esőnként egyszer.",
+          "rain_entities": "Üresen: minden ablak- és ajtóérzékelő.",
+          "self_test": "Éjszaka a hang kap néhány hétköznapi kérdést (kinti hőmérséklet, mi van nyitva, emlékeztetők, riasztó, pontos idő), és a válaszait összeveti a házzal. Ha valami nem stimmel, a ház állapotában megjelenik a használt eszközzel együtt. Futásonként kb. 5 AI-hívás. Csak kérdések – semmit nem kapcsol."
         }
       }
     },
@@ -236,7 +315,57 @@
           "animal_high": "Túl meleg e fölött",
           "screen": "Tablet képernyő használata",
           "screen_actions": "Ha valami megjelenik",
-          "screen_clear_actions": "Ha minden eltűnt"
+          "screen_clear_actions": "Ha minden eltűnt",
+          "prompt_recent": "Az utolsó óra a hang kontextusában",
+          "rules": "Szabályok, hanggal is létrehozva",
+          "relevant_memories": "A kérdéshez illő emlékek kiválasztása",
+          "look_cache_minutes": "Kameraválasz újrahasználása ennyi ideig",
+          "camera_prefilter": "Kamerapillantás kihagyása, ha semmi sem változott",
+          "budget_drive": "Napi AI-hívások: behajtó",
+          "budget_noticing": "Napi AI-hívások: észrevételek",
+          "budget_cameras": "Napi AI-hívások: kameraellenőrzések és figyelések",
+          "routine_evidence": "Mondja meg, milyen gyakran látott egy rutint",
+          "faces": "Nevek arcfelismerésből",
+          "face_people": "Csak ezek az emberek",
+          "face_teach": "Kérdezze meg telefonon, kik az ismeretlen arcok",
+          "face_teach_cameras": "Arcok tanulása ezekről a kamerákról",
+          "face_cameras": "Nevek csak ezekről a kamerákról",
+          "face_forget_hours": "Névtelen arcok elfelejtése ennyi idő után",
+          "clip_watch": "Eseményklipek megnézése",
+          "clip_cameras": "Kamerák",
+          "clip_scope": "Mely események",
+          "clip_when": "Mikor",
+          "clip_notify": "Küldés a telefonokra",
+          "clip_source": "Ki írja az összefoglalót",
+          "clip_whose": "Mondja meg, melyik családtag volt",
+          "clip_looks": "Hogy néznek ki az emberek, ha nem látszik az arcuk",
+          "budget_clips": "Naponta megnézett klipek (legfeljebb)",
+          "clip_days": "Összefoglalók megőrzése",
+          "clip_keep": "Klipfájlok megtartása",
+          "suggestions": "Javaslatok a Sentient oldalon",
+          "auto_backup": "Heti biztonsági mentés",
+          "backup_keep": "Hányat őrizzen meg",
+          "confirm_kinds": "Kérdezze meg „Megcsináljam?” ezek előtt",
+          "battery_forecast": "Szóljon, mikor merülnek le az elemek",
+          "smart_ai_task": "Erősebb AI a biztonsághoz és az éjszakai átgondoláshoz",
+          "event_clips": "Frigate eseményklipek megnézése",
+          "phone_buttons": "Gombok a telefonos értesítéseken",
+          "phone_apps": "Companion appok a gombokhoz",
+          "bins_check": "Kuka-ellenőrzés",
+          "bins_calendar": "Kukanaptár",
+          "bins_spot": "A kukák kameraterülete",
+          "bins_time": "Ellenőrzés ideje",
+          "style_feedback": "„Mondd másképp” a kimondott dolgokra",
+          "style_notes": "Hogyan mondja a dolgokat",
+          "known_cars": "A háztartás autói",
+          "hutch_check": "Alkonyati ólellenőrzés",
+          "hutch_spot": "Az ól kameraterülete",
+          "cat_watch": "Éjszakai macskafigyelés",
+          "cat_sensors": "Macskaérzékelők",
+          "cat_loud": "Éjjel azonnal szóljon",
+          "rain_warnings": "Esőfigyelmeztetés",
+          "rain_entities": "Figyelt ablakok és ajtók",
+          "self_test": "Önellenőrzés"
         },
         "data_description": {
           "motion_window": "Hány perc mozgáselőzményt vegyen figyelembe, amikor eldönti, hol vannak az emberek.",
@@ -344,7 +473,56 @@
           "animal_high": "Egyszer szól, ha e fölé emelkedik.",
           "screen": "Riasztások, értesítések és reggeli kártya a Sentient képernyő-kártyán (custom:sentient-screen-card). Kikapcsolva csak a ház áttekintését mutatja.",
           "screen_actions": "pl. a tablet felébresztése és a képernyő-kártyás oldalra váltás.",
-          "screen_clear_actions": "pl. a tablet visszaváltása a szokásos oldalára."
+          "screen_clear_actions": "pl. a tablet visszaváltása a szokásos oldalára.",
+          "prompt_recent": "Néhány sor arról, mi történt az utolsó órában és hol volt mozgás, így a „mi történt az előbb?” kérdésre azonnal tud felelni. Ingyenes: nincs plusz AI-hívás.",
+          "rules": "„Ha ez történik, csináld ezt” szabályok (a Szabályok oldal), és a hang is létrehozhatja őket: felolvassa a szabályt, és csak igen után menti. Szabály soha nem élesít, hatástalanít vagy nyit zárat. Kikapcsolva nem fut szabály.",
+          "relevant_memories": "Ha több emlék van, mint ami belefér a hang kontextusába, azokat kapja, amelyekben közös szavak vannak a kérdéssel, utána a legújabbakat. Ingyenes, AI nélkül. Kikapcsolva mindig a legújabbakat.",
+          "look_cache_minutes": "Ugyanarra a kérdésre ugyanannál a kameránál ennyi időn belül az előző választ adja új AI-pillantás helyett. 0: mindig újra néz.",
+          "camera_prefilter": "A kameraellenőrzések és figyelések előbb egy apró képet hasonlítanak össze (ezen a gépen, ingyen), és csak akkor kérdezik az AI-t, ha a kamera – vagy a területe – másképp néz ki, mint legutóbb.",
+          "budget_drive": "Saját napi keret az összkereten belül. 0: csak az összkeretet használja.",
+          "budget_noticing": "Saját napi keret az összkereten belül. 0: csak az összkeretet használja.",
+          "budget_cameras": "Saját napi keret az összkereten belül. 0: csak az összkeretet használja. A biztonság, a csengő és a feltett kérdések sosem várnak.",
+          "routine_evidence": "A rutin átvételét felajánló kérdés megmondja, milyen gyakran fordult elő, pl. „az utolsó 4 hétvégi napból 4”.",
+          "faces": "Ha a Frigate (vagy a csengő) felismer valakit, bekerül az idővonalba, és a hang tud felelni arra, hogy „hazaért Sanya?”. A neveket soha nem mondja be és nem találgatja – csak ha kérdezik. Alapból ki.",
+          "face_people": "A nevek, ahogy a Frigate ismeri őket. Üresen: mindenki, akit felismer.",
+          "face_teach": "Segít a Frigate arcfelismerésének fejlődni. Ha valaki elhagy egy kiválasztott kamerát, és a Frigate megtartott egy arcot, amit nem tudott megnevezni, a telefonok privát „Ki ez?” kérdést kapnak az arccal és a háztartás gombjaival (a telefonok legfeljebb hármat mutatnak). Egy gomb megnyomása megtanítja a Frigate-et; a „Valaki más…” alatt új nevet lehet beírni, vagy „nem”-et egy idegen arcának törléséhez. Soha nem hangzik el, soha nincs a tableteken, legfeljebb tízpercenként. Kell hozzá a Frigate arcfelismerés és értesítéshez kiválasztott telefonok. Alapból ki.",
+          "face_teach_cameras": "Közeli kamerák, ahol tisztán látszanak az arcok, pl. a csengő. Üresen: az ajtókamera.",
+          "face_cameras": "Üresen: minden kamera. Válaszd a közelieket (csengő, bejárati ajtó), hogy egy forgalmas utca ne adjon téves neveket.",
+          "face_forget_hours": "Minden éjjel a Frigate által megtartott, de senki által meg nem nevezett arcokat – többnyire idegenekét – törli a Frigate-ből, ha ennyi idősek. A megnevezett arcok megmaradnak. 0: a Frigate-re bízza (az utolsó 200-at tartja meg).",
+          "clip_watch": "Ha a Frigate befejez egy eseményt egy kiválasztott kamerán, az AI egyszer megnézi azt a felvételrészt, és egy mondat kerül az idővonalra és a Sentient oldalra: „Kapu 14:10 — egy férfi kutyát sétáltatott”. A hang ezekből felel arra, hogy „mi történt a kapunál?”, újabb AI-hívás nélkül. Soha nem hangzik el. Alapból ki.",
+          "clip_cameras": "Kezdd egyel, pl. a kapuval.",
+          "clip_scope": "A Frigate riasztásai a kötelezőnek jelölt zónákban lévő emberek – ez a legcsendesebb választás egy forgalmas utcánál.",
+          "clip_when": "Csak ezekben az időkben nézzen. Távol: mindenki, akit a Távolléti világításnál kiválasztottál, elment.",
+          "clip_notify": "Csak a telefonokra megy, képpel és lejátszás gombbal.",
+          "clip_source": "A Frigate saját AI-összefoglalóit a Frigate-ben kell bekapcsolni; ekkor itt nincs AI-hívás.",
+          "clip_whose": "Ugyanabban az AI-hívásban a háztartás arcképei a Frigate arckönyvtárából (és a lenti leírások) is mennek, és csak akkor nevez meg valakit, ha egyértelműen ő az – „valószínűleg Sanya”. Idegent soha nem nevez meg. Csak kérdésre mondja, sosem jelenti be.",
+          "clip_looks": "Soronként egy, pl. „Sanya: fekete motoros sisak és dzseki, motoron”. Segít, ha sisak vagy kapucni takarja az arcot.",
+          "budget_clips": "Ez is beleszámít a napi összes AI-keretbe. 0: nincs saját korlát.",
+          "clip_days": "Az összefoglalók csak szavak, utána törlődnek.",
+          "clip_keep": "Kikapcsolva minden klip törlődik, amint megnézte.",
+          "confirm_kinds": "A hang elmondja, mit fog csinálni, és igenre vár ezek előtt. A kikapcsolás sosem kér megerősítést. Üresen: egyszerűen megcsinálja. A riasztót hanggal semmiképp nem élesíti és nem hatástalanítja.",
+          "auto_backup": "Vasárnap éjjel mentés az emlékekről, területekről, rutinokról, mozgásérzékelős lámpákról, némításokról és a beállításokról, a config mappában, a sentient_backups alatt.",
+          "backup_keep": "A régebbiek törlődnek.",
+          "suggestions": "Dolgok, amiket a Sentient használhatna, de nem használ – egy új hangszóró, egy teljesítménymérő a mosógépen, egy ól-hőmérő –, soronként felajánlva. Igen: hozzáadja; nem: soha többé nem ajánlja. Ingyenes, AI nélkül.",
+          "smart_ai_task": "Nem kötelező. Csak a kamerás biztonsági pillantásokhoz és az éjszakai átgondoláshoz, ahol egy okosabb modell segít a legtöbbet. Üresen: a szokásos AI, így a költség nem változik.",
+          "event_clips": "Letölti a Frigate rövid eseményklipjét, és az AI megnézi, így meg tudja mondani, mi történt valójában („letett egy csomagot és elment”). Kamerás biztonsági riasztás után és a „mi történt az ajtónál?” kérdésre. Frigate integráció kell hozzá. Klipenként egy AI-hívás. Alapból ki.",
+          "phone_buttons": "A companion appon keresztül: az ajtónál – a kamerakép és egy Kamera gomb; emlékeztetőknél – Szundi 10 perc és Kész. Üresen: egyszerű értesítések, mint eddig.",
+          "phone_apps": "pl. notify.mobile_app_pixel_8. Üresen: az értesítéshez fent kiválasztott telefonok mögötti companion app (notify.telefonom → mobile_app_telefonom) – soha nem a tabletek.",
+          "bins_check": "A szállítás előtti estén egy kamerapillantás oda, ahová a kukák kikerülnek. Csak akkor szól, ha nincsenek kint: „Holnap szelektív, és még nincsenek kint a kukák.” Egy óra múlva még egyszer megnézi.",
+          "bins_calendar": "Üresen: egy hulladékszállítási naptár az összefoglaló naptárai közül.",
+          "bins_spot": "A Területek fülön rajzolva oda, ahová a kukák kikerülnek, pl. „kukák”.",
+          "bins_time": "A szállítás előtti estén, a csendes órák előtt.",
+          "style_feedback": "Egy gomb a hüvelykujjak mellett minden kimondott dolognál: Rövidebben, Egyszerűbben, Kevésbé pimaszul, Részletesebben, vagy írd meg, hogyan. Az alábbi megjegyzéseket aztán mindenhol követi, ahol beszél. Kikapcsolva nincs gomb, és a megjegyzéseket sem használja.",
+          "style_notes": "Soronként egy; a gombbal kerülnek ide, és te is szerkesztheted. A legutóbbi 8 számít.",
+          "known_cars": "Soronként egy, pl. „Sanya: sötétszürke kombi”. Ugyanaz a behajtó-pillantás ilyenkor megmondja, kinek az autója érkezett („Sanya autója megérkezett a behajtóra”) – plusz AI nélkül. Üresen: az autókat nem nevezi meg.",
+          "hutch_check": "Fél órával napnyugta után egy AI-pillantás az ólra: bent vannak-e, és be van-e zárva? Csak akkor szól, ha nem.",
+          "hutch_spot": "Az ól köré rajzolt terület a Területek fülön, pl. „nyúlketrec”.",
+          "cat_watch": "Sötétedés után, ha az ól kameráján bekapcsol egy macskaérzékelő, egy AI-pillantás: van-e macska az ólnál? Legfeljebb 15 percenként, és nem, ha a kép nem változott.",
+          "cat_sensors": "Üresen: az ól kamerájának macskaérzékelői (pl. a Frigate macska-jelenléte).",
+          "cat_loud": "Kikapcsolva reggelre tartja („Hajnali 2:14-kor egy macska járt az ólnál”). Bekapcsolva azonnal elmondja az éjszakai őrség hangszóróin.",
+          "rain_warnings": "Ha egy órán belül eső várható, és nyitva van egy ablak vagy ajtó: „Egy órán belül eső jön, és nyitva van a hálószoba ablaka.” Az óránkénti előrejelzésből – AI nélkül. Esőnként egyszer.",
+          "rain_entities": "Üresen: minden ablak- és ajtóérzékelő.",
+          "self_test": "Éjszaka a hang kap néhány hétköznapi kérdést (kinti hőmérséklet, mi van nyitva, emlékeztetők, riasztó, pontos idő), és a válaszait összeveti a házzal. Ha valami nem stimmel, a ház állapotában megjelenik a használt eszközzel együtt. Futásonként kb. 5 AI-hívás. Csak kérdések – semmit nem kapcsol."
         }
       },
       "memories": {
@@ -554,6 +732,69 @@
         "chill": "Chill",
         "halloween": "Halloween",
         "christmas": "Karácsony"
+      }
+    },
+    "confirm_kinds": {
+      "options": {
+        "locks": "Zárak",
+        "garage": "Garázsajtók és kapuk",
+        "covers": "Redőnyök, függönyök és árnyékolók",
+        "heating": "A fűtés nagy mértékű feljebb vétele",
+        "appliances": "Háztartási gépek indítása"
+      }
+    },
+    "self_test": {
+      "options": {
+        "off": "Ki",
+        "nightly": "Minden éjjel",
+        "weekly": "Hetente egyszer (vasárnap éjjel)"
+      }
+    },
+    "check_now": {
+      "options": {
+        "self_test": "Önellenőrzés",
+        "rain": "Esőfigyelmeztetés",
+        "hutch": "Ólellenőrzés",
+        "cat": "Macskafigyelés",
+        "bins": "Kuka-ellenőrzés",
+        "faces": "Ki ez? (arctanítás)",
+        "faces_forget": "Névtelen arcok elfelejtése most",
+        "clip_watch": "A legutóbbi klip megnézése most"
+      }
+    },
+    "clip_scope": {
+      "options": {
+        "alerts": "Csak Frigate riasztások",
+        "zones": "Bármi egy zónában",
+        "all": "Minden észlelés"
+      }
+    },
+    "clip_when": {
+      "options": {
+        "always": "Mindig",
+        "quiet": "Csendes órák",
+        "away": "Ha mindenki távol van",
+        "quiet_or_away": "Csendes órák vagy ha mindenki távol van"
+      }
+    },
+    "clip_notify": {
+      "options": {
+        "off": "Ki",
+        "worth": "Amelyekre érdemes ránézni",
+        "suspicious": "Csak gyanúsak",
+        "all": "Minden klip"
+      }
+    },
+    "clip_source": {
+      "options": {
+        "sentient": "Sentient (klipenként egy AI-hívás)",
+        "frigate": "A Frigate saját AI-összefoglalói"
+      }
+    },
+    "phone_buttons": {
+      "options": {
+        "door": "Az ajtónál",
+        "reminders": "Emlékeztetők"
       }
     }
   },
@@ -991,6 +1232,16 @@
     "morning_card": {
       "name": "Reggeli kártya",
       "description": "A mai reggeli kártya kitétele most a Sentient képernyőre."
+    },
+    "check_now": {
+      "name": "Ellenőrzés most",
+      "description": "Egy választható ellenőrzés azonnali futtatása – önellenőrzés, eső, ól, macskafigyelés, kuka, „ki ez?” az ajtókamera legutóbbi névtelen arcára, a névtelen arcok elfelejtése, vagy az első klipkamera legutóbbi klipjének megnézése.",
+      "fields": {
+        "what": {
+          "name": "Melyik",
+          "description": "Melyik ellenőrzés fusson."
+        }
+      }
     }
   }
 }

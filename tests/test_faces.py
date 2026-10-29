@@ -50,7 +50,7 @@ async def _ring(hass: HomeAssistant) -> None:
 async def test_own_face_recognition_names_the_family_and_stays_quiet(hass: HomeAssistant) -> None:
     entry = await _setup(hass)
     said = async_mock_service(hass, "assist_satellite", "announce")
-    faces = entry.runtime_data.faces
+    faces = entry.runtime_data.faceid
     with patch("custom_components.sentient.visitors.async_picture", AsyncMock(return_value=b"jpeg")), \
          patch.object(faces, "async_identify", AsyncMock(return_value={"name": "Kata", "id": "f1", "count": 1})) as ident:
         await _ring(hass)
@@ -63,7 +63,7 @@ async def test_own_face_recognition_names_the_family_and_stays_quiet(hass: HomeA
 async def test_a_stranger_is_announced_and_can_be_taught_afterwards(hass: HomeAssistant) -> None:
     entry = await _setup(hass)
     said = async_mock_service(hass, "assist_satellite", "announce")
-    faces = entry.runtime_data.faces
+    faces = entry.runtime_data.faceid
     with patch("custom_components.sentient.visitors.async_picture", AsyncMock(return_value=b"jpeg")), \
          patch.object(faces, "async_identify", AsyncMock(return_value={"name": None, "id": "f2", "count": 1})):
         await _ring(hass)
@@ -82,7 +82,7 @@ async def test_a_stranger_is_announced_and_can_be_taught_afterwards(hass: HomeAs
 
 async def test_learning_a_face_from_a_camera_and_a_photo(hass: HomeAssistant) -> None:
     entry = await _setup(hass)
-    faces = entry.runtime_data.faces
+    faces = entry.runtime_data.faceid
     ctx = llm.LLMContext(platform="test", context=None, language="en", assistant="conversation", device_id=None)
     api = await llm.async_get_api(hass, "sentient", ctx)
     with patch("custom_components.sentient.visitors.async_picture", AsyncMock(return_value=b"jpeg")) as pic, \
@@ -98,7 +98,7 @@ async def test_learning_a_face_from_a_camera_and_a_photo(hass: HomeAssistant) ->
     out = await api.async_call_tool(llm.ToolInput(tool_name="sentient_learn_face", tool_args={"name": "Kata"}))
     assert "no recent visit" in out["error"]
 
-    with patch("custom_components.sentient.faces.async_photo", AsyncMock(return_value=b"photo")) as photo, \
+    with patch("custom_components.sentient.faceid.async_photo", AsyncMock(return_value=b"photo")) as photo, \
          patch.object(faces, "async_learn_picture", AsyncMock(return_value=1)) as learn:
         res = await hass.services.async_call(
             DOMAIN, "learn_face",

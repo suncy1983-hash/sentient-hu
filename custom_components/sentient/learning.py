@@ -36,6 +36,7 @@ from homeassistant.util import dt as dt_util
 from . import i18n
 from .i18n import t as _t
 from .const import (
+    CONF_ROUTINE_EVIDENCE,
     CONF_LEARN_ENTITIES,
     CONF_LINK_TRIGGERS,
     CONF_SUGGEST_ROUTINES,
@@ -129,11 +130,17 @@ class Routine:
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
+    def evidence(self) -> str:
+        """'4 of the last 4 weekend days' — the plain numbers behind the offer."""
+        total = max(self.seen, round(self.seen / self.support)) if self.support else self.seen
+        noun = {"on weekdays": "learning.n_weekdays", "at weekends": "learning.n_weekend_days"}.get(self.days, "learning.n_days")
+        return _t("learning.evidence", seen=self.seen, total=total, noun=_t(noun))
+
     def summary(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "routine": self.describe(),
-            "how_sure": _t("learning.how_sure_days", pct=round(self.support * 100)),
+            "how_sure": _t("learning.how_sure_days", pct=round(self.support * 100)) + f" ({self.evidence()})",
             "adopted": self.adopted,
         }
 
@@ -663,10 +670,15 @@ class Learner:
             return
         if self.tracker is not None and self.tracker.best_area() is None:
             return  # nobody obviously about; try again later
+        evidence = self.options.get(CONF_ROUTINE_EVIDENCE, True)
         said = routine.describe()
+        if isinstance(routine, Link):
+            seen = _t("learning.seen_times", n=routine.seen) if evidence else ""
+        else:
+            seen = f", {routine.evidence()}" if evidence else ""
         question = _t(
             "learning.offer_link" if isinstance(routine, Link) else "learning.offer",
-            said=f"{said[0].lower()}{said[1:-1]}",
+            said=f"{said[0].lower()}{said[1:-1]}{seen}",
         )
         result = await self.speech.async_ask(
             question,

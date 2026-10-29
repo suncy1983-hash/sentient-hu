@@ -25,7 +25,7 @@
     REMINDERS: "EMLÉKEZTETŐK", "COMING UP": "KÖVETKEZIK", "TO DO": "TEENDŐK", OPEN: "NYITVA", "NEEDS A LOOK": "NÉZD MEG",
     "A THOUGHT": "EGY GONDOLAT", ASLEEP: "ALSZIK", AWAKE: "ÉBREN", "THE HOUSE": "A HÁZ", "VISITORS TODAY": "MAI LÁTOGATÓK",
     "ALL GOOD": "MINDEN RENDBEN", PROBLEMS: "HIBA", "HOUSE HEALTH": "A HÁZ ÁLLAPOTA", running: "megy", "DONE ~": "KÉSZ ~",
-    NOTICE: "ÉRTESÍTÉS", MORNING: "REGGEL", "ALL QUIET": "CSEND",
+    NOTICE: "ÉRTESÍTÉS", MORNING: "REGGEL", "ALL QUIET": "CSEND", TOMORROW: "HOLNAP", BACK: "VISSZA", "LAST HOUR": "UTOLSÓ ÓRA", "THE LAST HOUR": "AZ UTOLSÓ ÓRA", Close: "Bezárás", "Nothing in the last hour.": "Az utolsó órában nem történt semmi.",
     "clear-night": "derült", cloudy: "felhős", fog: "köd", hail: "jégeső", lightning: "villámlás", "lightning-rainy": "zivatar",
     partlycloudy: "részben felhős", pouring: "felhőszakadás", rainy: "esős", snowy: "havas", "snowy-rainy": "havas eső",
     sunny: "napos", windy: "szeles", "windy-variant": "szeles", exceptional: "rendkívüli",
@@ -33,6 +33,7 @@
   let lang = "en";
   const L = (t) => (lang === "hu" && HU[t] != null ? HU[t] : t);
   const loc = () => (lang === "hu" ? "hu-HU" : "en-GB");
+  const dayHm = (iso) => { const d = new Date(iso); if (isNaN(d)) return ""; const t = hm(iso); return d.toDateString() === new Date().toDateString() ? t : L("TOMORROW") + " " + t; };
   const KEYS = ["screen", "last_spoken", "watches", "visitors", "health", "house", "mind", "drive"];
   const SOURCE_ICON = [
     ["visitors", "mdi:doorbell-video"], ["announce:", "mdi:bullhorn-outline"], ["critical", "mdi:fire-alert"],
@@ -96,6 +97,7 @@
       this.shadowRoot.addEventListener("click", (ev) => {
         const x = ev.target.closest("[data-x]");
         if (x) { this._hass.callService("sentient", "clear_screen", { card_id: x.dataset.x }); return; }
+        if (ev.target.closest("[data-lh]")) { this._toggleLastHour(); return; }
         const more = ev.target.closest("[data-more]");
         if (more) this.dispatchEvent(new CustomEvent("hass-more-info", { bubbles: true, composed: true, detail: { entityId: more.dataset.more } }));
       });
@@ -125,6 +127,7 @@
       const main = this._$("main");
       if (mode === "alert" || mode === "notice") main.innerHTML = this._cards(cards);
       else if (mode === "morning" && morning) main.innerHTML = this._morning(morning);
+      else if (this._lh) main.innerHTML = this._lastHour();
       else main.innerHTML = this._idle();
       this._$("foot").innerHTML = this._foot();
       this._refreshCamera(true);
@@ -181,8 +184,9 @@
         const asking = /^(offer|curious|learning)/.test(l.source || "") || /\?\s*$/.test(l.said);
         return age < (asking ? 10 : 120);
       });
-      const watches = this._attr("watches", "watches", []);
+      const watches = this._attr("watches", "watches", []).filter((w) => w.kind !== "reminder");
       const next = watches.slice().sort((a, b) => String(a.ends).localeCompare(String(b.ends)))[0];
+      const soon = this._cfg.coming_up === false ? [] : this._attr("screen", "coming_up", []);
       const mind = (this._st("mind") || {}).attributes || {};
       const running = (mind.appliances || []).filter((a) => a.running);
       const problems = this._attr("health", "issues", []);
@@ -200,20 +204,44 @@
       return `<div class="idle"><div class="tiles">${tiles.map((t) => `<div class="tile ${t.cls || ""}"${t.more ? ` data-more="${esc(t.more)}"` : ""}><ha-icon icon="${t.icon}"></ha-icon><b>${esc(t.val)}</b><i>${esc(t.label)}</i></div>`).join("")}</div>
         <div class="lines">
           ${running.map((a) => `<div class="row"><ha-icon icon="mdi:washing-machine"></ha-icon><b>${esc(a.name)} ${L("running")}</b><u>${a.done_about ? L("DONE ~") + esc(a.done_about) : ""}</u></div>`).join("")}
-          ${next ? `<div class="row"><ha-icon icon="${next.kind === "reminder" ? "mdi:bell-ring-outline" : "mdi:eye-outline"}"></ha-icon><b>${esc(next.what)}</b><u>${hm(next.ends)}</u></div>` : ""}
+          ${soon.length ? `<div class="soonh">${L("COMING UP")}</div>` + soon.map((c) => `<div class="row"><ha-icon icon="${c.kind === "alarm" ? "mdi:alarm" : "mdi:bell-ring-outline"}"></ha-icon><b>${esc(c.what)}</b><u>${dayHm(c.at)}</u></div>`).join("") : ""}
+          ${next ? `<div class="row"><ha-icon icon="mdi:eye-outline"></ha-icon><b>${esc(next.what)}</b><u>${hm(next.ends)}</u></div>` : ""}
           ${problems.slice(0, 2).map((p) => `<div class="row warn"><ha-icon icon="mdi:alert-outline"></ha-icon><b>${esc(p.text || p.name)}</b></div>`).join("")}
           ${said ? `<div class="row dim"><ha-icon icon="mdi:account-voice"></ha-icon><b>${esc(said.said)}</b><u>${hm(said.time)}</u></div>` : ""}
         </div></div>`;
     }
 
+    // "what happened this last hour?" — straight from the timeline, no AI; closes itself after a minute
+    async _toggleLastHour() {
+      clearTimeout(this._lhTimer);
+      if (this._lh) { this._lh = null; this._draw(); return; }
+      try {
+        const res = await this._hass.callWS({ type: "sentient/timeline", hours: 1, limit: 30 });
+        this._lh = (res.items || []).filter((i) => !["held", "digest"].includes(i.kind));
+      } catch (e) { this._lh = []; }
+      this._lhTimer = setTimeout(() => { this._lh = null; this._draw(); }, 60000);
+      this._draw();
+    }
+
+    _lastHour() {
+      const rows = this._lh.length ? this._lh.map((i) => `<div class="row"><ha-icon icon="${this._icon(i.source || i.kind)}"></ha-icon><b>${esc(i.text)}</b><u>${hm(i.time)}</u></div>`).join("")
+        : `<div class="row dim"><b>${L("Nothing in the last hour.")}</b></div>`;
+      return `<div class="morning"><div class="mh"><span>${L("THE LAST HOUR")}</span><a class="x" data-lh="1" title="${L("Close")}">✕</a></div><div class="lines">${rows}</div></div>`;
+    }
+
     _foot() {
       const mode = (this._st("screen") || {}).state || "idle";
       const label = L({ alert: "ALERT", notice: "NOTICE", morning: "MORNING", idle: "ALL QUIET" }[mode] || "");
-      return `<span class="dot ${mode}"></span><span>${label}</span>`;
+      const btn = this._cfg.last_hour === false || mode !== "idle" ? ""
+        : `<a class="lhb" data-lh="1"><ha-icon icon="mdi:history"></ha-icon>${L(this._lh ? "BACK" : "LAST HOUR")}</a>`;
+      return `<span class="dot ${mode}"></span><span>${label}</span>${btn}`;
     }
   }
 
   const CSS = `
+.lhb{margin-left:auto;display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border:1px solid rgba(0,255,247,.35);border-radius:999px;color:#7ff6ff;letter-spacing:.12em}
+.lhb ha-icon{--mdc-icon-size:16px}
+.soonh{font-size:10px;font-weight:700;letter-spacing:.24em;color:rgba(150,220,235,.6);margin:6px 0 2px}
 :host{display:block}
 ha-card{overflow:hidden;border-radius:22px;border:1px solid rgba(0,255,247,.25);color:#dff6fa;
   background:radial-gradient(ellipse at 50% 0%,rgba(0,255,247,.08),transparent 55%),linear-gradient(160deg,#070c16,#0e1627);box-shadow:0 0 28px rgba(0,255,255,.1)}

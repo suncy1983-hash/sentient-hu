@@ -92,13 +92,13 @@ async def test_recognised_name_is_used_when_fresh(hass: HomeAssistant) -> None:
     await _setup(hass, announce_visitors=True, parcel_alerts=False, face_sensor="sensor.doorbell_face")
     said = async_mock_service(hass, "assist_satellite", "announce")
     _ai(hass, [{"kind": "visitor", "description": "A man in a red coat"}])
-    hass.states.async_set("sensor.doorbell_face", "conah")
+    hass.states.async_set("sensor.doorbell_face", "alex")
     with patch("custom_components.sentient.visitors.asyncio.sleep"):
         hass.states.async_set("binary_sensor.doorbell", "on")
         await hass.async_block_till_done()
-    assert said[-1].data["message"] == "Conah's at the door."
+    assert said[-1].data["message"] == "Alex's at the door."
     log = hass.states.get("sensor.nova_visitors").attributes["recent"]
-    assert log[0]["name"] == "Conah"
+    assert log[0]["name"] == "Alex"
 
 
 async def test_doorstep_visit_without_ring_checks_for_parcel_once(hass: HomeAssistant, freezer) -> None:
@@ -131,7 +131,8 @@ async def test_doorstep_visit_without_ring_checks_for_parcel_once(hass: HomeAssi
     await visit(3)  # same parcel still there: not said again
     await visit(3)  # taken in
     await visit(3)  # new post
-    assert len(ai) == 4
+    # only the doorstep checks: other parts of the house may make their own calls while the clock jumps
+    assert len([c for c in ai if "doorstep" in c.data["task_name"]]) == 4
     assert len(said) == 2
 
 

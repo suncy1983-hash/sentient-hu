@@ -88,7 +88,7 @@ from .sleep import Sleep
 from .watches import WatchManager
 from .speech import SpeechRouter
 from .voice import VoiceID
-from .faces import FaceID
+from .faceid import FaceID
 from .semantic import Embedder, SemanticIndex
 
 _LOGGER = logging.getLogger(__name__)
@@ -122,10 +122,11 @@ class SentientRuntime:
     shortcuts: Shortcuts
     left_open: LeftOpen
     feedback: Feedback
+    suggestions: Any
     heating: Heating
     night_watch: NightWatch
     voice: VoiceID
-    faces: FaceID
+    faceid: FaceID
     followthrough: FollowThrough
     lists: dict[str, Items]
     offers: Offers
@@ -147,6 +148,15 @@ class SentientRuntime:
     appliances: Appliances
     animals: Animals
     away: Away
+    selftest: Any
+    rain: Any
+    pets: Any
+    autobackup: Any
+    bins: Any
+    faces: Any
+    rules: Any
+    clips: Any
+    clipwatch: Any
     watchdog: Watchdog
     screen: Screen
 
@@ -348,6 +358,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
     entry.async_on_unload(watches.async_stop)
     feedback = Feedback(hass, entry.entry_id)
     await feedback.async_load()
+    from .suggestions import Suggestions
+
+    suggestions = Suggestions(hass, entry.entry_id)
+    await suggestions.async_load()
     noticer = Noticer(hass, options, speech, memory, watches)
     noticer.feedback = feedback
     noticer.async_start()
@@ -398,6 +412,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
     alarms = Alarms(hass, lists["alarms"], get_rt)
     checks = CameraChecks(hass, lists["checks"], get_rt)
     autooff = AutoOff(hass, lists["autooff"], get_rt)
+    from .rules import Rules
+
+    rules = Rules(hass, lists["rules"], get_rt)
     camsec = CameraSecurity(hass, options, get_rt)
     party = Party(hass, entry.entry_id, options, get_rt)
     followthrough = FollowThrough(hass, speech, timeline)
@@ -414,6 +431,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
     appliances = Appliances(hass, entry.entry_id, options, get_rt)
     animals = Animals(hass, options, get_rt)
     away = Away(hass, entry.entry_id, options, get_rt)
+    from .pets import Pets
+    from .rain import Rain
+    from .selftest import SelfTest
+
+    selftest = SelfTest(hass, entry.entry_id, options, get_rt)
+    rain = Rain(hass, options, get_rt)
+    pets = Pets(hass, options, get_rt)
+    from .backup import AutoBackup
+
+    autobackup = AutoBackup(hass, entry, options)
+    from .bins import Bins
+
+    bins = Bins(hass, options, get_rt)
+    from .faces import Faces
+
+    faces = Faces(hass, entry.entry_id, options, get_rt)
+    from .clips import Clips
+
+    clips = Clips(hass, options, get_rt)
+    from .clipwatch import ClipWatch
+
+    clipwatch = ClipWatch(hass, entry.entry_id, options, get_rt)
     learner.extra_automated = away.times
     watchdog = Watchdog(hass, entry.entry_id, options, get_rt)
     screen = Screen(hass, options, get_rt)
@@ -422,6 +461,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
     guard.async_start()
     entry.async_on_unload(guard.async_stop)
     conversations.guard = guard
+    notifier.on_snooze = lambda what, delay: watches.add_reminder(what, minutes=delay.total_seconds() / 60)
     noticer.skip = appliances.handled  # appliances (and the rest of their device) say "finished" themselves, without the AI
     shortcuts.on_run = sleep.routine_ran
     speech.on_unheard = followyou.unheard
@@ -436,17 +476,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: SentientConfigEntry) -> 
         lists=lists, offers=offers, announcements=announcements, alarms=alarms, checks=checks, camsec=camsec,
         party=party, followyou=followyou, loops=loops, conversations=conversations, curiosity=curiosity,
         reflection=reflection, drive=drive, autooff=autooff, foresight=foresight, sleep=sleep,
-        ai=ai, appliances=appliances, animals=animals, watchdog=watchdog, screen=screen, away=away,
-        voice=VoiceID(hass, options), faces=visitors.faces,
+        ai=ai, appliances=appliances, animals=animals, watchdog=watchdog, screen=screen, away=away, suggestions=suggestions,
+        selftest=selftest, rain=rain, pets=pets, autobackup=autobackup, bins=bins, faces=faces, rules=rules, clips=clips, clipwatch=clipwatch,
+        voice=VoiceID(hass, options), faceid=visitors.faces,
     )
-    for engine in (followyou, loops, conversations, curiosity, reflection, drive, foresight, sleep, appliances, animals, watchdog, screen, away):
+    for engine in (followyou, loops, conversations, curiosity, reflection, drive, foresight, sleep, appliances, animals, watchdog, screen, away, selftest, rain, pets, autobackup, bins, faces, clipwatch):
         await engine.async_start()
         entry.async_on_unload(engine.async_stop)
     await party.async_start()
     entry.async_on_unload(party.async_stop)
     night_watch.async_start()
     entry.async_on_unload(night_watch.async_stop)
-    for engine in (offers, announcements, alarms, checks, camsec, autooff):
+    for engine in (offers, announcements, alarms, checks, camsec, autooff, rules):
         engine.async_start()
         entry.async_on_unload(engine.async_stop)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
@@ -507,7 +548,7 @@ async def _async_options_updated(hass: HomeAssistant, entry: SentientConfigEntry
     entry.runtime_data.night_watch.options = options
     entry.runtime_data.camsec.options = options
     entry.runtime_data.party.options = options
-    for name in ("followyou", "loops", "conversations", "curiosity", "reflection", "drive", "foresight", "sleep", "ai", "appliances", "animals", "watchdog", "screen", "away"):
+    for name in ("followyou", "loops", "conversations", "curiosity", "reflection", "drive", "foresight", "sleep", "ai", "appliances", "animals", "watchdog", "screen", "away", "selftest", "rain", "pets", "autobackup", "bins", "faces", "clips", "clipwatch"):
         getattr(entry.runtime_data, name).options = options
     entry.runtime_data.drive.async_setup_triggers()
     hass.bus.async_fire(EVENT_MODE_CHANGED, {"options": True})  # switches refresh what they show
@@ -632,12 +673,12 @@ def _register_services(hass: HomeAssistant) -> None:
         return {"cancelled": removed.what if removed else None}
 
     async def learn_face(call: ServiceCall) -> ServiceResponse:
-        from .faces import FaceError, async_photo, async_picture  # noqa: PLC0415
+        from .faceid import FaceError, async_photo, async_picture  # noqa: PLC0415
 
         rt = _runtime(hass)
         name = call.data["name"].strip()
         if call.data.get("forget"):
-            return {"forgotten": await rt.faces.async_forget(name)}
+            return {"forgotten": await rt.faceid.async_forget(name)}
         photo = call.data.get("photo")
         if isinstance(photo, dict):
             photo = photo.get("media_content_id")
@@ -647,7 +688,7 @@ def _register_services(hass: HomeAssistant) -> None:
             content = await async_picture(hass, call.data["camera"])
         else:
             raise FaceError("Give a photo or a camera to learn the face from")
-        return {"learned": name, "samples": await rt.faces.async_learn_picture(name, content)}
+        return {"learned": name, "samples": await rt.faceid.async_learn_picture(name, content)}
 
     hass.services.async_register(
         DOMAIN, "learn_face", learn_face,
@@ -738,6 +779,32 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, "clear_screen", clear_screen,
                                  schema=vol.Schema({vol.Optional("card_id"): cv.string}))
     hass.services.async_register(DOMAIN, "morning_card", morning_card, supports_response=SupportsResponse.OPTIONAL)
+
+    async def check_now(call: ServiceCall) -> ServiceResponse:
+        """Run one of the optional checks straight away (works even when its schedule is off)."""
+        rt, what = _runtime(hass), call.data["what"]
+        if what == "self_test":
+            return await rt.selftest.async_run(force=True)
+        if what == "rain":
+            return await rt.rain.async_check(force=True)
+        if what == "hutch":
+            return await rt.pets.async_hutch(force=True)
+        if what == "bins":
+            return await rt.bins.async_check(force=True)
+        if what == "faces_forget":
+            return await rt.faces.async_forget_old(force=True)
+        if what == "clip_watch":
+            cams = rt.clipwatch.cameras()
+            return await rt.clipwatch.async_latest(cams[0]) if cams else {"error": "no clip camera chosen"}
+        if what == "faces":
+            cams = rt.faces.teach_cameras()
+            return await rt.faces.async_ask(cams[0], force=True) if cams else {"error": "no camera chosen"}
+        return await rt.pets.async_cat(force=True)
+
+    hass.services.async_register(
+        DOMAIN, "check_now", check_now, supports_response=SupportsResponse.OPTIONAL,
+        schema=vol.Schema({vol.Required("what"): vol.In(["self_test", "rain", "hutch", "cat", "bins", "faces", "faces_forget", "clip_watch"])}),
+    )
 
     async def look_ahead(call: ServiceCall) -> ServiceResponse:
         return await _runtime(hass).foresight.async_look_ahead(speak=call.data.get("speak", False))

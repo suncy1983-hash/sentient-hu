@@ -44,7 +44,7 @@ from .const import (
 )
 from . import i18n
 from .i18n import t
-from .faces import FaceError, FaceID, async_picture
+from .faceid import FaceError, FaceID, async_picture
 from .memory import _fold
 from .watches import local_when
 

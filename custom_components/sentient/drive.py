@@ -30,6 +30,7 @@ from .const import (
     CONF_DRIVE_CAMERA,
     CONF_DRIVE_SPOT,
     CONF_DRIVE_TRIGGERS,
+    CONF_KNOWN_CARS,
     DEFAULT_DRIVE_SPOT,
     DOMAIN,
 )
@@ -163,6 +164,8 @@ class Drive:
                 "estate', 'small white van'). If it's too dark or unclear to tell, set unsure."
             ),
             "structure": {
+                **({"whose": {"description": "Whose cars these are, from the known cars, comma-separated; empty if none clearly match",
+                              "required": False, "selector": {"text": {}}}} if self.known() else {}),
                 "cars": {"description": "How many cars or vans are on the drive", "required": True,
                          "selector": {"number": {"min": 0, "max": 10}}},
                 "description": {"description": "A few words on each, comma-separated; empty if none", "required": False,
@@ -172,6 +175,9 @@ class Drive:
             },
             "attachments": [await rt.spots.async_attachment(spot["camera"], _key(spot["name"]))],
         }
+        if known := self.known():
+            data["instructions"] += (" Known household cars: " + "; ".join(f"{who} — {what}" for who, what in known)
+                                     + ". In 'whose', name a car only if it clearly matches one of these.")
         if ai_entity := self.options.get(CONF_AI_TASK_ENTITY):
             data["entity_id"] = ai_entity
         if not rt.watches.spend("drive", force=force):
@@ -190,25 +196,41 @@ class Drive:
         except (TypeError, ValueError):
             return self.describe()
         description = " ".join(str(result.get("description") or "").split()).strip(" .")
+        names = {who.lower(): who for who, _ in self.known()}
+        whose = [names[w.strip().lower()] for w in str(result.get("whose") or "").split(",") if w.strip().lower() in names]
         before = self.state.get("cars")
         self._same = 0 if before is None or cars != before else self._same + 1
         if unsure and before is not None:
             self.state["checked"] = now.isoformat()  # keep what we knew; it's just dark
         else:
-            self.state = {"cars": cars, "description": description, "checked": now.isoformat(),
+            had = set(self.state.get("whose") or [])
+            self.state = {"cars": cars, "description": description, "checked": now.isoformat(), "whose": whose,
                           "changed": now.isoformat() if cars != before else self.state.get("changed")}
             if before is not None and cars != before:
-                if cars > before:
+                came = [w for w in whose if w not in had]
+                if cars > before and came:
+                    text = t("drive.arrived_whose", name=came[0]) + (t("drive.now", description=description) if description else "")
+                elif cars > before:
                     text = t("drive.arrived") + (t("drive.now", description=description) if description else "")
                 else:
-                    text = t("drive.left") + (t("drive.still", description=description) if cars and description else
-                                                  t("drive.clear") if not cars else "")
+                    gone = [w for w in had if w not in whose]
+                    text = (t("drive.left_whose", name=gone[0]) if gone else t("drive.left")) + (
+                        t("drive.still", description=description) if cars and description else t("drive.clear") if not cars else "")
                 rt.timeline.add("drive", text, t("drive.count", n=cars))
         if fingerprint:
             self.state["fingerprint"] = fingerprint
         self._store.async_delay_save(lambda: {"state": self.state}, 2)
         self.hass.bus.async_fire(EVENT_DRIVE, self.describe())
         return self.describe()
+
+    def known(self) -> list[tuple[str, str]]:
+        """[(whose, what it looks like)] from the settings: one 'Sam: dark grey hatchback' per line."""
+        out = []
+        for line in str(self.options.get(CONF_KNOWN_CARS) or "").splitlines():
+            who, _, what = line.partition(":")
+            if who.strip() and what.strip():
+                out.append((who.strip(), what.strip()))
+        return out
 
     def cooldown(self) -> timedelta:
         return min(MAX_COOLDOWN, COOLDOWN * (2 ** min(self._same, 6)))
@@ -223,6 +245,7 @@ class Drive:
             "checked": dt_util.as_local(checked).strftime("%H:%M") if checked else None,
             "checked_at": self.state.get("checked"),
             "changed_at": self.state.get("changed"),
+            "whose": self.state.get("whose") or [],
         }
 
     def prompt_line(self) -> str | None:
@@ -230,5 +253,7 @@ class Drive:
         if d.get("cars") is None:
             return None
         what = "nothing parked" if not d["cars"] else f"{d['cars']} — {d['description']}" if d["description"] else str(d["cars"])
+        if d.get("whose"):
+            what += " (" + ", ".join(f"{w}'s" for w in d["whose"]) + ")"
         return (f"On the drive (last checked {d['checked']}): {what}. For a fresh look, call sentient_look "
                 "with the drive spot.")

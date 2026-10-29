@@ -110,7 +110,7 @@ def test_routine_and_link_described_in_hungarian() -> None:
     r = Routine(entity_id="light.eloszoba", name="Előszoba lámpa", state="on", minute=17 * 60 + 30,
                 days="on weekdays", support=0.8, seen=8, spread=5)
     assert r.describe() == "Az előszoba lámpa hétköznap általában 17:30 körül bekapcsol."
-    assert r.summary()["how_sure"] == "a napok 80%-ában"
+    assert r.summary()["how_sure"] == "a napok 80%-ában (az utolsó 10 hétköznapból 8)"
     link = Link(cause="binary_sensor.hatso_ajto", cause_name="Hátsó ajtó", cause_state="on",
                 entity_id="light.konyha", name="Konyha lámpa", state="on", dark=True, lag=40,
                 support=0.9, seen=8, cause_class="door")
